@@ -61,6 +61,14 @@ class DependencyGraph:
     # Properties
     # ------------------------------------------------------------------
 
+    def add_file_node(self, path: str) -> None:
+        """Add a file node to the file-level graph."""
+        self._file_graph.add_node(path)  # type: ignore[misc]
+
+    def add_file_edge(self, source: str, target: str, kind: str = "imports") -> None:
+        """Add an edge to the file-level graph."""
+        self._file_graph.add_edge(source, target, kind=kind)  # type: ignore[misc]
+
     @property
     def file_count(self) -> int:
         return self._file_graph.number_of_nodes()  # type: ignore[misc]

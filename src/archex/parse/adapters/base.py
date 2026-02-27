@@ -27,21 +27,15 @@ class LanguageAdapter(Protocol):
         """tree-sitter grammar name (e.g., 'python')."""
         ...
 
-    def extract_symbols(
-        self, tree: object, source: bytes, file_path: str
-    ) -> list[Symbol]:
+    def extract_symbols(self, tree: object, source: bytes, file_path: str) -> list[Symbol]:
         """Extract all symbols (functions, classes, methods) from a parsed tree."""
         ...
 
-    def parse_imports(
-        self, tree: object, source: bytes, file_path: str
-    ) -> list[ImportStatement]:
+    def parse_imports(self, tree: object, source: bytes, file_path: str) -> list[ImportStatement]:
         """Extract all import statements from a parsed tree."""
         ...
 
-    def resolve_import(
-        self, imp: ImportStatement, file_map: dict[str, str]
-    ) -> str | None:
+    def resolve_import(self, imp: ImportStatement, file_map: dict[str, str]) -> str | None:
         """Resolve an import to an absolute file path, or None if external."""
         ...
 

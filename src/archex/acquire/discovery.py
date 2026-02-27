@@ -88,11 +88,7 @@ def discover_files(
         except subprocess.TimeoutExpired as exc:
             raise AcquireError("git ls-files timed out") from exc
     else:
-        raw_paths = [
-            str(p.relative_to(repo_path))
-            for p in repo_path.rglob("*")
-            if p.is_file()
-        ]
+        raw_paths = [str(p.relative_to(repo_path)) for p in repo_path.rglob("*") if p.is_file()]
 
     discovered: list[DiscoveredFile] = []
     for rel in raw_paths:

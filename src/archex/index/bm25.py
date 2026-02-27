@@ -2,4 +2,75 @@
 
 from __future__ import annotations
 
-# TODO: Implement in Phase 2
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from archex.index.store import IndexStore
+    from archex.models import CodeChunk
+
+_CREATE_FTS = """
+CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
+    chunk_id UNINDEXED,
+    content,
+    symbol_name
+);
+"""
+
+_DROP_FTS_ROWS = "DELETE FROM chunks_fts;"
+
+
+def _escape_fts_query(query: str) -> str:
+    """Escape FTS5 special characters and join tokens with OR for partial matching."""
+    tokens = query.split()
+    if not tokens:
+        return ""
+    # Strip double-quotes from tokens, wrap each in quotes, join with OR
+    escaped = " OR ".join(f'"{t.replace(chr(34), "")}"' for t in tokens)
+    return escaped
+
+
+class BM25Index:
+    """BM25 keyword index using SQLite FTS5."""
+
+    def __init__(self, store: IndexStore) -> None:
+        self._store = store
+        store.conn.execute(_CREATE_FTS)
+        store.conn.commit()
+
+    def build(self, chunks: list[CodeChunk]) -> None:
+        conn = self._store.conn
+        conn.execute(_DROP_FTS_ROWS)
+        conn.executemany(
+            "INSERT INTO chunks_fts (chunk_id, content, symbol_name) VALUES (?, ?, ?)",
+            [(c.id, c.content, c.symbol_name or "") for c in chunks],
+        )
+        conn.commit()
+
+    def search(self, query: str, top_k: int = 20) -> list[tuple[CodeChunk, float]]:
+        if not query.strip():
+            return []
+
+        escaped = _escape_fts_query(query)
+        if not escaped:
+            return []
+
+        conn = self._store.conn
+        try:
+            cur = conn.execute(
+                "SELECT chunk_id, bm25(chunks_fts) AS score "
+                "FROM chunks_fts WHERE chunks_fts MATCH ? ORDER BY score LIMIT ?",
+                (escaped, top_k),
+            )
+        except Exception:
+            return []
+
+        results: list[tuple[CodeChunk, float]] = []
+        for chunk_id, raw_score in cur.fetchall():
+            chunk = self._store.get_chunk(str(chunk_id))
+            if chunk is None:
+                continue
+            # FTS5 bm25() returns negative values; negate for positive relevance score
+            score = -float(raw_score)
+            results.append((chunk, score))
+
+        return results

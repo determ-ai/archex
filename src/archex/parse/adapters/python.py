@@ -374,9 +374,7 @@ class PythonAdapter:
 
         return class_symbols + func_symbols
 
-    def parse_imports(
-        self, tree: object, source: bytes, file_path: str
-    ) -> list[ImportStatement]:
+    def parse_imports(self, tree: object, source: bytes, file_path: str) -> list[ImportStatement]:
         """Extract all import statements by walking the top-level module children."""
         t: Any = tree
         root: object = t.root_node
@@ -406,9 +404,7 @@ class PythonAdapter:
 
         return imports
 
-    def resolve_import(
-        self, imp: ImportStatement, file_map: dict[str, str]
-    ) -> str | None:
+    def resolve_import(self, imp: ImportStatement, file_map: dict[str, str]) -> str | None:
         """Resolve an import to a file path, or None for external imports."""
         if imp.is_relative:
             module = imp.module
@@ -462,10 +458,7 @@ class PythonAdapter:
             except OSError:
                 continue
 
-            if (
-                'if __name__ == "__main__"' in content
-                or "if __name__ == '__main__'" in content
-            ):
+            if 'if __name__ == "__main__"' in content or "if __name__ == '__main__'" in content:
                 entry_points.append(f.path)
                 continue
 

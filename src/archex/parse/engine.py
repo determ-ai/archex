@@ -50,9 +50,7 @@ class TreeSitterEngine:
             func = getattr(module, func_name)
             lang = Language(func())  # pyright: ignore[reportDeprecated]
         except Exception as exc:
-            raise ParseError(
-                f"Failed to load tree-sitter language {language_id!r}: {exc}"
-            ) from exc
+            raise ParseError(f"Failed to load tree-sitter language {language_id!r}: {exc}") from exc
 
         self._languages[language_id] = lang
         return lang
