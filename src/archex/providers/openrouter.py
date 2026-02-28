@@ -6,6 +6,7 @@ import json
 import os
 from typing import Any
 
+from archex.config import DEFAULT_MODELS
 from archex.exceptions import ProviderError
 
 _OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -15,8 +16,10 @@ class OpenRouterProvider:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "anthropic/claude-sonnet-4-20250514",
+        model: str | None = None,
     ) -> None:
+        if model is None:
+            model = DEFAULT_MODELS["openrouter"]
         try:
             import openai as _openai  # type: ignore[import-untyped]
         except ImportError as exc:

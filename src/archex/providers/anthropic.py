@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from typing import Any
 
+from archex.config import DEFAULT_MODELS
 from archex.exceptions import ProviderError
 
 
@@ -12,8 +13,10 @@ class AnthropicProvider:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "claude-sonnet-4-20250514",
+        model: str | None = None,
     ) -> None:
+        if model is None:
+            model = DEFAULT_MODELS["anthropic"]
         try:
             import anthropic as _anthropic  # type: ignore[import-untyped]
         except ImportError as exc:

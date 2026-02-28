@@ -6,6 +6,7 @@ import json
 import os
 from typing import Any
 
+from archex.config import DEFAULT_MODELS
 from archex.exceptions import ProviderError
 
 
@@ -13,8 +14,10 @@ class OpenAIProvider:
     def __init__(
         self,
         api_key: str | None = None,
-        model: str = "gpt-4.1",
+        model: str | None = None,
     ) -> None:
+        if model is None:
+            model = DEFAULT_MODELS["openai"]
         try:
             import openai as _openai  # type: ignore[import-untyped]
         except ImportError as exc:
