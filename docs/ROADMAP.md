@@ -183,15 +183,15 @@ tests/fixtures/
 
 ### Acceptance Criteria
 
-- [ ] `uv sync` installs all deps cleanly on Python 3.11 and 3.12
-- [ ] `pytest` runs (0 tests, 0 failures — test infrastructure works)
-- [ ] `ruff check .` passes
-- [ ] `pyright .` passes
-- [ ] `archex --version` prints version
-- [ ] `archex --help` prints help with all subcommand stubs
+- [x] `uv sync` installs all deps cleanly on Python 3.11 and 3.12
+- [x] `pytest` runs (0 tests, 0 failures — test infrastructure works)
+- [x] `ruff check .` passes
+- [x] `pyright .` passes
+- [x] `archex --version` prints version
+- [x] `archex --help` prints help with all subcommand stubs
 - [ ] GitHub Actions CI passes on push
-- [ ] `uv build` produces a wheel
-- [ ] All fixture repos are committed and accessible in tests
+- [x] `uv build` produces a wheel
+- [x] All fixture repos are committed and accessible in tests
 
 ---
 
@@ -298,15 +298,15 @@ def detect_entry_points(files: list[ParsedFile]) -> list[str]:
 
 ### Phase 1 Acceptance Criteria
 
-- [ ] `analyze("https://github.com/pallets/click")` returns a valid ArchProfile
-- [ ] ArchProfile contains correct file count, line count, language breakdown
-- [ ] All Python symbols extracted (functions, classes, methods, types)
-- [ ] All imports parsed and internal imports resolved to file paths
-- [ ] Dependency graph has correct file-level and symbol-level edges
-- [ ] ArchProfile.interface_surface lists public APIs correctly
-- [ ] `archex analyze <url> --format json` outputs valid JSON to stdout
-- [ ] All tests pass, coverage > 80% for new code
-- [ ] Local fixture tests run without network access
+- [x] `analyze("https://github.com/pallets/click")` returns a valid ArchProfile
+- [x] ArchProfile contains correct file count, line count, language breakdown
+- [x] All Python symbols extracted (functions, classes, methods, types)
+- [x] All imports parsed and internal imports resolved to file paths
+- [x] Dependency graph has correct file-level and symbol-level edges
+- [x] ArchProfile.interface_surface lists public APIs correctly
+- [x] `archex analyze <url> --format json` outputs valid JSON to stdout
+- [x] All tests pass, coverage > 80% for new code
+- [x] Local fixture tests run without network access
 
 ### Known Risks
 
@@ -394,14 +394,14 @@ def detect_entry_points(files: list[ParsedFile]) -> list[str]:
 
 ### Phase 2 Acceptance Criteria
 
-- [ ] `query("https://github.com/pallets/click", "How does command registration work?", token_budget=4000)` returns a valid ContextBundle
-- [ ] ContextBundle token count ≤ specified budget
-- [ ] Chunks are syntax-aligned (no split functions/classes)
-- [ ] `to_prompt(format="xml")` produces well-formed XML
-- [ ] BM25 retrieval returns relevant results for keyword queries
-- [ ] Index is cached and reused on subsequent queries to the same repo
-- [ ] `archex query` CLI command works end-to-end
-- [ ] All tests pass, coverage > 80%
+- [x] `query("https://github.com/pallets/click", "How does command registration work?", token_budget=4000)` returns a valid ContextBundle
+- [x] ContextBundle token count ≤ specified budget
+- [x] Chunks are syntax-aligned (no split functions/classes)
+- [x] `to_prompt(format="xml")` produces well-formed XML
+- [x] BM25 retrieval returns relevant results for keyword queries
+- [x] Index is cached and reused on subsequent queries to the same repo
+- [x] `archex query` CLI command works end-to-end
+- [x] All tests pass, coverage > 80%
 
 ---
 
@@ -506,13 +506,13 @@ def detect_entry_points(files: list[ParsedFile]) -> list[str]:
 
 ### Phase 3 Acceptance Criteria
 
-- [ ] Module detection correctly identifies 2+ modules in a multi-module repo
-- [ ] Pattern detection finds middleware chain in Express-like fixture
-- [ ] TypeScript adapter parses all common import/export styles
-- [ ] `analyze()` with `enrich=True` + provider produces enriched decisions
-- [ ] `analyze()` with `enrich=False` produces complete structural profile (no LLM calls)
-- [ ] Full ArchProfile renders as readable Markdown with Mermaid dependency diagrams
-- [ ] All tests pass, coverage > 80%
+- [x] Module detection correctly identifies 2+ modules in a multi-module repo
+- [x] Pattern detection finds middleware chain in Express-like fixture
+- [x] TypeScript adapter parses all common import/export styles
+- [x] `analyze()` with `enrich=True` + provider produces enriched decisions
+- [x] `analyze()` with `enrich=False` produces complete structural profile (no LLM calls)
+- [x] Full ArchProfile renders as readable Markdown with Mermaid dependency diagrams
+- [x] All tests pass, coverage > 80%
 
 ---
 
@@ -592,16 +592,16 @@ elif strategy == "vector" and vector_index is not None:
 
 ### Phase 4 Acceptance Criteria
 
-- [ ] `compare()` produces valid ComparisonResult for two Python repos
-- [ ] Go adapter parses Go fixture correctly (exports, interfaces, methods)
-- [ ] Rust adapter parses Rust fixture correctly (pub, traits, mod system)
-- [ ] Vector index build + search works with Nomic Embed Code via ONNX
-- [ ] Hybrid retrieval (BM25 + vector) improves result quality over BM25-only
-- [ ] CLI is polished with progress bars, error messages, timing
+- [x] `compare()` produces valid ComparisonResult for two Python repos
+- [x] Go adapter parses Go fixture correctly (exports, interfaces, methods)
+- [x] Rust adapter parses Rust fixture correctly (pub, traits, mod system)
+- [x] Vector index build + search works with Nomic Embed Code via ONNX
+- [x] Hybrid retrieval (BM25 + vector) improves result quality over BM25-only
+- [x] CLI is polished with progress bars, error messages, timing
 - [ ] `pip install archex` from PyPI works
 - [ ] `pip install archex[vector]` installs ONNX + embeddings
-- [ ] README has clear quick-start and usage examples
-- [ ] All tests pass, coverage > 75% overall
+- [x] README has clear quick-start and usage examples
+- [x] All tests pass, coverage > 75% overall
 
 ---
 

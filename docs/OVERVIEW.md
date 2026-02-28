@@ -240,11 +240,11 @@ result = compare(
 ### 5.2 As a CLI
 
 ```bash
-archex analyze https://github.com/encode/httpx --format md
+archex analyze https://github.com/encode/httpx --format markdown
 archex query https://github.com/encode/httpx "How does pooling work?" --budget 8000
 archex compare httpx requests --dimensions error_handling,api_surface
 archex cache list
-archex cache clean --older-than 7d
+archex cache clean --max-age 168
 ```
 
 ### 5.3 As an Agent Tool
