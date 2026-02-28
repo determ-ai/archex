@@ -1,5 +1,15 @@
-"""Abstract base class for embedding providers: defines the encode interface."""
+"""Embedder protocol: defines the interface for embedding providers."""
 
 from __future__ import annotations
 
-# TODO: Implement in Phase 2
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class Embedder(Protocol):
+    """Protocol for embedding providers that encode text into dense vectors."""
+
+    def encode(self, texts: list[str]) -> list[list[float]]: ...
+
+    @property
+    def dimension(self) -> int: ...

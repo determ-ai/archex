@@ -1,5 +1,9 @@
-"""Embeddings sub-package: base interface and provider-specific embedding implementations."""
+"""Embeddings sub-package: base protocol and provider-specific implementations."""
 
 from __future__ import annotations
 
-# TODO: Implement in Phase 2
+from archex.index.embeddings.base import Embedder
+
+__all__ = [
+    "Embedder",
+]
