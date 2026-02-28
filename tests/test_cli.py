@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 from click.testing import CliRunner
 
+from archex import __version__
 from archex.cli.main import cli
 
 if TYPE_CHECKING:
@@ -16,7 +17,7 @@ def test_version() -> None:
     runner = CliRunner()
     result = runner.invoke(cli, ["--version"])
     assert result.exit_code == 0
-    assert "archex, version 0.2.0" in result.output
+    assert f"archex, version {__version__}" in result.output
 
 
 def test_help_contains_subcommands() -> None:
@@ -79,7 +80,7 @@ def test_compare_error_handling() -> None:
     from archex.exceptions import ArchexError
 
     runner = CliRunner()
-    with patch("archex.cli.compare_cmd.analyze", side_effect=ArchexError("Analyze failed")):
+    with patch("archex.cli.compare_cmd.compare", side_effect=ArchexError("Analyze failed")):
         result = runner.invoke(cli, ["compare", "/fake/a", "/fake/b"])
     assert result.exit_code != 0
     assert "Analyze failed" in result.output
@@ -91,3 +92,70 @@ def test_compare_type_check_raises_type_error() -> None:
     # Test that non-ComparisonResult raises TypeError
     with pytest.raises(TypeError, match="Expected ComparisonResult"):
         render_comparison_markdown({"not": "a_comparison_result"})
+
+
+class TestCacheList:
+    def test_empty_cache(self, tmp_path: Path) -> None:
+        runner = CliRunner()
+        cache_dir = str(tmp_path / "empty_cache")
+        result = runner.invoke(cli, ["cache", "list", "--cache-dir", cache_dir])
+        assert result.exit_code == 0
+        assert "No cached entries" in result.output
+
+    def test_lists_entries(self, tmp_path: Path) -> None:
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        # Create a fake cache entry
+        key = "a" * 64
+        (cache_dir / f"{key}.db").write_text("fake")
+        (cache_dir / f"{key}.meta").write_text("1234567890.0")
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["cache", "list", "--cache-dir", str(cache_dir)])
+        assert result.exit_code == 0
+        assert key[:12] in result.output
+
+
+class TestCacheClean:
+    def test_clean_removes_old(self, tmp_path: Path) -> None:
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        key = "b" * 64
+        (cache_dir / f"{key}.db").write_text("fake")
+        (cache_dir / f"{key}.meta").write_text("0")  # epoch = very old
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["cache", "clean", "--max-age", "1", "--cache-dir", str(cache_dir)]
+        )
+        assert result.exit_code == 0
+        assert "Removed 1" in result.output
+
+    def test_clean_keeps_recent(self, tmp_path: Path) -> None:
+        import time
+
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        key = "c" * 64
+        (cache_dir / f"{key}.db").write_text("fake")
+        (cache_dir / f"{key}.meta").write_text(str(time.time()))
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli, ["cache", "clean", "--max-age", "24", "--cache-dir", str(cache_dir)]
+        )
+        assert result.exit_code == 0
+        assert "Removed 0" in result.output
+
+
+class TestCacheInfo:
+    def test_info_output(self, tmp_path: Path) -> None:
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+
+        runner = CliRunner()
+        result = runner.invoke(cli, ["cache", "info", "--cache-dir", str(cache_dir)])
+        assert result.exit_code == 0
+        assert "Cache directory" in result.output
+        assert "Total entries" in result.output
+        assert "Total size" in result.output
