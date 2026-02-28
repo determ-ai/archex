@@ -67,7 +67,7 @@ gantt
 # pyproject.toml
 [project]
 name = "archex"
-version = "0.1.0dev0"
+version = "0.1.0"
 description = "Architecture extraction & codebase intelligence for the agentic era"
 readme = "README.md"
 license = { text = "MIT" }
