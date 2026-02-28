@@ -6,12 +6,15 @@ archex is a Python library and CLI that transforms any Git repository into struc
 
 ## Features
 
-- **4 language adapters** — Python, TypeScript/JavaScript, Go, Rust (tree-sitter AST parsing)
+- **4 language adapters** — Python, TypeScript/JavaScript, Go, Rust (tree-sitter AST parsing), extensible via entry points
 - **3 public APIs** — `analyze()`, `query()`, `compare()`
 - **Hybrid retrieval** — BM25 keyword search + optional vector embeddings with reciprocal rank fusion
-- **Token budget assembly** — AST-aware chunking, dependency-graph expansion, greedy bin-packing
-- **Structural analysis** — module detection (Louvain), pattern recognition, interface extraction
+- **Token budget assembly** — AST-aware chunking, dependency-graph expansion, greedy bin-packing with configurable `ScoringWeights`
+- **Structural analysis** — module detection (Louvain), pattern recognition (extensible `PatternRegistry`), interface extraction
 - **Cross-repo comparison** — 6 architectural dimensions, no LLM required
+- **Performance** — cache-first query (skips parse on cache hit), parallel parsing, parallel compare, git-aware cache keys
+- **Extensibility** — plugin APIs for language adapters, pattern detectors, chunkers, and scoring weights via entry points and protocols
+- **Security** — input validation on git URLs/branches, FTS5 query escaping, cache key validation, `allow_pickle=False` for vector persistence
 - **LLM-optional** — entire structural pipeline runs without API calls; LLM enrichment is opt-in
 
 ## Installation
@@ -29,6 +32,9 @@ pip install archex
 | `archex[voyage]`       | Voyage Code API embeddings               |
 | `archex[openai]`       | OpenAI API embeddings + LLM enrichment   |
 | `archex[anthropic]`    | Anthropic API LLM enrichment             |
+| `archex[mcp]`          | MCP server for agent integration         |
+| `archex[langchain]`    | LangChain retriever integration          |
+| `archex[llamaindex]`   | LlamaIndex retriever integration         |
 | `archex[all]`          | All optional dependencies                |
 
 ## Quick Start
@@ -53,6 +59,15 @@ bundle = query(
     token_budget=8192,
 )
 print(bundle.to_prompt(format="xml"))
+
+# Query with custom scoring weights
+from archex.models import ScoringWeights
+
+bundle = query(
+    RepoSource(local_path="./my-project"),
+    "database connection pooling",
+    scoring_weights=ScoringWeights(relevance=0.8, structural=0.1, type_coverage=0.1),
+)
 
 # Cross-repo comparison
 result = compare(
@@ -115,8 +130,15 @@ Compare two repositories across architectural dimensions.
 | `--dimensions`      | all 6   | Comma-separated dimension list    |
 | `--format`          | `json`  | Output format: `json`, `markdown` |
 | `-l` / `--language` | all     | Filter by language (repeatable)   |
+| `--timing`          | off     | Print timing breakdown to stderr  |
 
 Supported dimensions: `api_surface`, `concurrency`, `configuration`, `error_handling`, `state_management`, `testing`.
+
+### `archex mcp`
+
+Start the MCP (Model Context Protocol) server for agent integration.
+
+Tools exposed: `analyze_repo`, `query_repo`, `compare_repos`.
 
 ### `archex cache <subcommand>`
 
@@ -128,14 +150,82 @@ Manage the local analysis cache.
 | `clean`    | `--max-age N` (hours), `--cache-dir` | Remove expired entries |
 | `info`     | `--cache-dir`                        | Show cache summary     |
 
+## Extensibility
+
+archex supports plugin APIs via Python entry points and protocols.
+
+### Custom Language Adapters
+
+Register a language adapter in your package's `pyproject.toml`:
+
+```toml
+[project.entry-points."archex.language_adapters"]
+java = "mypackage.adapters:JavaAdapter"
+```
+
+The adapter class must implement the `LanguageAdapter` protocol (see `archex.parse.adapters.base`).
+
+### Custom Pattern Detectors
+
+Register a pattern detector function:
+
+```toml
+[project.entry-points."archex.pattern_detectors"]
+my_pattern = "mypackage.patterns:detect_my_pattern"
+```
+
+Detector signature: `(list[ParsedFile], DependencyGraph) -> DetectedPattern | None`.
+
+### Custom Chunkers
+
+Implement the `Chunker` protocol and pass it to `query()`:
+
+```python
+from archex.index.chunker import Chunker
+
+class MyChunker:
+    def chunk_file(self, parsed_file, source): ...
+    def chunk_files(self, parsed_files, sources): ...
+
+bundle = query(source, question, chunker=MyChunker())
+```
+
+### Custom Scoring Weights
+
+Adjust the retrieval ranking formula:
+
+```python
+from archex.models import ScoringWeights
+
+# Boost relevance, lower structural weight
+weights = ScoringWeights(relevance=0.8, structural=0.1, type_coverage=0.1)
+bundle = query(source, question, scoring_weights=weights)
+```
+
+## Configuration
+
+archex reads configuration from `~/.archex/config.toml` and `ARCHEX_*` environment variables.
+
+```toml
+# ~/.archex/config.toml
+[default]
+languages = ["python", "typescript"]
+cache = true
+cache_dir = "~/.archex/cache"
+parallel = true
+max_file_size = 10000000
+```
+
+Environment variables override file config: `ARCHEX_CACHE_DIR`, `ARCHEX_PARALLEL`, `ARCHEX_MAX_FILE_SIZE`.
+
 ## Development
 
 ```bash
-git clone https://github.com/AetherForge/archex.git
+git clone https://github.com/Mathews-Tom/archex.git
 cd archex
 uv sync --all-extras
 
-# Run tests (372 tests)
+# Run tests (538 tests)
 uv run pytest
 
 # Lint and format
