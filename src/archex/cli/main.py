@@ -8,6 +8,7 @@ from archex import __version__
 from archex.cli.analyze_cmd import analyze_cmd
 from archex.cli.cache_cmd import cache_cmd
 from archex.cli.compare_cmd import compare_cmd
+from archex.cli.mcp_cmd import mcp_cmd
 from archex.cli.query_cmd import query_cmd
 
 
@@ -21,6 +22,7 @@ cli.add_command(analyze_cmd)
 cli.add_command(query_cmd)
 cli.add_command(compare_cmd)
 cli.add_command(cache_cmd)
+cli.add_command(mcp_cmd)
 
 
 if __name__ == "__main__":

@@ -34,10 +34,14 @@ vector-torch = ["sentence-transformers>=2.6"]
 voyage = ["voyageai>=0.3"]
 openai = ["openai>=1.0"]
 anthropic = ["anthropic>=0.30"]
-all = ["archex[vector,voyage,openai,anthropic]"]
+mcp = ["mcp>=1.0"]
+langchain = ["langchain-core>=0.2"]
+llamaindex = ["llama-index-core>=0.10"]
+all = ["archex[vector,voyage,openai,anthropic,mcp,langchain,llamaindex]"]
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "pytest-asyncio>=0.23",
     "ruff>=0.5",
     "pyright>=1.1",
     "pre-commit>=3.7",
