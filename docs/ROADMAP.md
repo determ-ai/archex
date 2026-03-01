@@ -32,6 +32,9 @@ gantt
 
     section Phase 6
     Harden + Optimize + Polish + Extend :done, p6, 2026-03-01, 1d
+
+    section Phase 7
+    Refactor + Test Coverage            :done, p7, 2026-03-01, 1d
 ```
 
 | Phase                              | Duration | Goal                                                                            | Key Deliverable                                          | Status       |
@@ -43,6 +46,7 @@ gantt
 | **4 — Compare + Ship**             | ~3 weeks | Cross-repo comparison, Go/Rust adapters, vector index, CLI polish, PyPI publish | `archex` v0.1.0 on PyPI with 4 language adapters         | ✅ Complete  |
 | **5 — Ecosystem**                  | ~3 weeks | MCP integration, framework adapters, Attest evals, content pipeline             | Integrations with Claude Code, LangChain, CAIRN          | ✅ Complete  |
 | **6 — Harden, Optimize, Polish, Extend** | ~1 week  | Security hardening, performance optimization, code polish, extensibility APIs   | v0.3.0 — 538 tests, 84% coverage, plugin entry points   | ✅ Complete  |
+| **7 — Refactor + Test Coverage**         | ~1 day   | Source simplification, error handling, adapter dedup, 90% test coverage         | v0.4.0 — 641 tests, 90% coverage, shared ts_node module | ✅ Complete  |
 
 ---
 
@@ -765,6 +769,64 @@ Build evaluation datasets and assertions using Attest's graduated assertion pipe
 
 ---
 
+## Phase 7 — Refactor + Test Coverage
+
+> **Goal:** Source code simplification, shared infrastructure extraction, improved error observability, and comprehensive test coverage to reach 90%.
+
+### Phase 7a — Refactoring
+
+| Deliverable | Details |
+| --- | --- |
+| **Shared `ts_node` module** | Extract duplicate `_text`/`_type`/`_children`/`_field`/`_start_line`/`_end_line` helpers from Python, Go, Rust, TypeScript adapters into `parse/adapters/ts_node.py` |
+| **Dead code removal** | Remove unused `get_adapter()`, `_extract_interfaces()`, redundant `add_node` in `from_edges()`, unused `index_config` param from `api.analyze()` |
+| **Dependency deduplication** | Use sets instead of lists in `_build_module_from_community` for O(1) membership |
+| **Chunker optimization** | Remove unnecessary `sorted()` on already-ordered covered ranges |
+| **Vector zero-copy** | `copy=False` on `numpy.astype` when array is already float32 |
+
+### Phase 7b — Error Handling & Logging
+
+| Deliverable | Details |
+| --- | --- |
+| **LLM failure logging** | `infer_decisions()` logs enrichment failures with `logger.warning()` instead of silently catching |
+| **FTS5 failure logging** | `BM25Index.search()` logs query failures instead of silently returning empty |
+| **Explicit dimension error** | `SentenceTransformerEmbedder.dimension` raises `ArchexIndexError` instead of bare `assert` |
+
+### Phase 7c — Configuration & Standards
+
+| Deliverable | Details |
+| --- | --- |
+| **`DEFAULT_CACHE_DIR`** | Centralized constant in `config.py`, used by all CLI cache commands |
+| **Config validation** | `model_fields` over `hasattr` for Pydantic v2 correctness |
+| **`validate_dimensions()`** | Extracted from `compare_repos()` for reuse by MCP integration |
+| **Install instructions** | All `pip install` references replaced with `uv add` across CLI, integrations, docstrings |
+
+### Phase 7d — Test Coverage (84% → 90%)
+
+| Test file | Tests added | Target coverage |
+| --- | --- | --- |
+| `tests/test_config.py` (new) | 25 | config.py 41% → 100% |
+| `tests/parse/test_adapter_registry.py` (new) | 5 | adapters/__init__.py 79% → 100% |
+| `tests/serve/test_renderers.py` (new) | 9 | markdown.py 63% → 100%, xml.py 69% → 100% |
+| `tests/serve/test_compare.py` | 13 | compare_cmd.py 42% → 94% |
+| `tests/analyze/test_interfaces.py` | 8 | interfaces.py 85% → 97% |
+| `tests/analyze/test_modules.py` | 10 | modules.py 83% → 100% |
+| `tests/analyze/test_patterns.py` | 7 | patterns.py 89% → 100% |
+| `tests/index/test_chunker.py` | 7 | chunker.py 88% → 90% |
+| `tests/parse/adapters/test_rust.py` | 11 | rust.py 73% → 90% |
+| `tests/parse/test_imports.py` | 4 | edge cases |
+| `tests/acquire/test_discovery.py` | 4 | discovery.py 85% → 100% |
+
+### Phase 7 Acceptance Criteria
+
+- [x] Shared `ts_node` module eliminates ~140 lines of duplicated adapter code
+- [x] All silent exception handlers replaced with logged warnings
+- [x] No bare `assert` statements in production code
+- [x] All `pip` references replaced with `uv`
+- [x] 641 tests, 90% coverage, 0 pyright errors, ruff clean
+- [x] v0.4.0 published to PyPI
+
+---
+
 ## Success Metrics
 
 ### v0.1.0 Release (End of Phase 4)
@@ -796,6 +858,17 @@ Build evaluation datasets and assertions using Attest's graduated assertion pipe
 | Extensibility          | Plugin entry points     | ✅ 2 entry point groups + protocols      |
 | Test suite             | > 500 tests, > 80%     | ✅ 538 tests, 84% coverage              |
 | Type safety            | 0 pyright errors        | ✅                                       |
+
+### v0.4.0 (End of Phase 7)
+
+| Metric                 | Target                  | Actual                                   |
+| ---------------------- | ----------------------- | ---------------------------------------- |
+| Code deduplication     | Shared adapter helpers  | ✅ ts_node module, ~140 lines removed   |
+| Dead code removal      | No unused functions     | ✅ 4 unused functions/params removed    |
+| Error observability    | No silent catches       | ✅ 3 silent handlers replaced with logs |
+| Test suite             | > 600 tests, 90%       | ✅ 641 tests, 90% coverage              |
+| Type safety            | 0 pyright errors        | ✅                                       |
+| Lint clean             | ruff check + format     | ✅                                       |
 
 ---
 
