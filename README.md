@@ -225,7 +225,7 @@ git clone https://github.com/Mathews-Tom/archex.git
 cd archex
 uv sync --all-extras
 
-# Run tests (538 tests)
+# Run tests (641 tests, 90% coverage)
 uv run pytest
 
 # Lint and format
