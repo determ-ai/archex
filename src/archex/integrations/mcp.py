@@ -3,12 +3,27 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
-from typing import Any
+import time
+from typing import TYPE_CHECKING, Any
 
-from archex.api import analyze, compare, query
+from archex.api import (
+    analyze,
+    compare,
+    file_outline,
+    file_tree,
+    get_symbol,
+    get_symbols_batch,
+    query,
+    search_symbols,
+)
+from archex.reporting import compute_meta
 from archex.serve.compare import validate_dimensions
 from archex.utils import resolve_source
+
+if TYPE_CHECKING:
+    from archex.models import FileTreeEntry
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +100,115 @@ def handle_compare_repos(
     source_b = resolve_source(repo_b)
     result = compare(source_a, source_b, dimensions=dim_list)
     return result.model_dump_json(indent=2)
+
+
+def _sum_tree_lines(entries: list[FileTreeEntry]) -> int:
+    """Recursively sum line counts across all leaf files in a tree."""
+    total = 0
+    for entry in entries:
+        if entry.is_directory:
+            total += _sum_tree_lines(entry.children)
+        else:
+            total += entry.lines
+    return total
+
+
+def handle_get_file_tree(repo_url: str, max_depth: int = 5, language: str | None = None) -> str:
+    source = resolve_source(repo_url)
+    t0 = time.perf_counter()
+    result = file_tree(source, max_depth=max_depth, language=language)
+    elapsed = (time.perf_counter() - t0) * 1000
+    content = result.model_dump_json(indent=2)
+    raw_lines = _sum_tree_lines(result.entries)
+    meta = compute_meta(
+        tool_name="get_file_tree",
+        response_text=content,
+        raw_file_tokens=raw_lines * 10,
+        strategy="file_tree",
+        query_time_ms=elapsed,
+    )
+    return json.dumps({"content": json.loads(content), "_meta": meta.model_dump()}, indent=2)
+
+
+def handle_get_file_outline(repo_url: str, file_path: str) -> str:
+    source = resolve_source(repo_url)
+    t0 = time.perf_counter()
+    result = file_outline(source, file_path=file_path)
+    elapsed = (time.perf_counter() - t0) * 1000
+    content = result.model_dump_json(indent=2)
+    meta = compute_meta(
+        tool_name="get_file_outline",
+        response_text=content,
+        raw_file_tokens=result.token_count_raw,
+        strategy="file_outline",
+        query_time_ms=elapsed,
+    )
+    return json.dumps({"content": json.loads(content), "_meta": meta.model_dump()}, indent=2)
+
+
+def handle_search_symbols(
+    repo_url: str,
+    query_text: str,
+    kind: str | None = None,
+    language: str | None = None,
+    limit: int = 20,
+) -> str:
+    source = resolve_source(repo_url)
+    t0 = time.perf_counter()
+    matches = search_symbols(source, query=query_text, kind=kind, language=language, limit=limit)
+    elapsed = (time.perf_counter() - t0) * 1000
+    match_data = [m.model_dump() for m in matches]
+    content = json.dumps(match_data, indent=2)
+    unique_files = {m.file_path for m in matches}
+    raw_estimate = len(unique_files) * 5000
+    meta = compute_meta(
+        tool_name="search_symbols",
+        response_text=content,
+        raw_file_tokens=raw_estimate,
+        strategy="symbol_search",
+        query_time_ms=elapsed,
+    )
+    return json.dumps({"content": match_data, "_meta": meta.model_dump()}, indent=2)
+
+
+def handle_get_symbol(repo_url: str, symbol_id: str) -> str:
+    source = resolve_source(repo_url)
+    t0 = time.perf_counter()
+    result = get_symbol(source, symbol_id=symbol_id)
+    elapsed = (time.perf_counter() - t0) * 1000
+    if result is None:
+        return json.dumps({"error": "Symbol not found", "symbol_id": symbol_id})
+    content = result.model_dump_json(indent=2)
+    meta = compute_meta(
+        tool_name="get_symbol",
+        response_text=content,
+        raw_file_tokens=max(result.token_count * 5, 1),
+        strategy="symbol_lookup",
+        query_time_ms=elapsed,
+    )
+    return json.dumps({"content": json.loads(content), "_meta": meta.model_dump()}, indent=2)
+
+
+def handle_get_symbols_batch(repo_url: str, symbol_ids: list[str]) -> str:
+    if len(symbol_ids) > 50:
+        raise ValueError(f"symbol_ids must contain at most 50 entries, got {len(symbol_ids)}")
+    source = resolve_source(repo_url)
+    t0 = time.perf_counter()
+    results = get_symbols_batch(source, symbol_ids=symbol_ids)
+    elapsed = (time.perf_counter() - t0) * 1000
+    result_data = [s.model_dump() if s else None for s in results]
+    content = json.dumps(result_data, indent=2)
+    unique_files = {s.file_path for s in results if s is not None}
+    raw_tokens = sum(s.token_count for s in results if s is not None)
+    raw_estimate = max(raw_tokens * 5, len(unique_files) * 5000)
+    meta = compute_meta(
+        tool_name="get_symbols_batch",
+        response_text=content,
+        raw_file_tokens=raw_estimate,
+        strategy="symbol_batch",
+        query_time_ms=elapsed,
+    )
+    return json.dumps({"content": result_data, "_meta": meta.model_dump()}, indent=2)
 
 
 def build_server() -> Any:
@@ -194,6 +318,127 @@ def build_server() -> Any:
                     "required": ["repo_a", "repo_b"],
                 },
             ),
+            mcp_types.Tool(
+                name="get_file_tree",
+                description=(
+                    "Return a hierarchical file tree for a repository, optionally filtered "
+                    "by language and depth."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "repo_url": {
+                            "type": "string",
+                            "description": "Local path or HTTP(S) URL of the repository.",
+                        },
+                        "max_depth": {
+                            "type": "integer",
+                            "default": 5,
+                            "description": "Maximum directory depth to traverse.",
+                        },
+                        "language": {
+                            "type": "string",
+                            "description": "Filter results to files of this language.",
+                        },
+                    },
+                    "required": ["repo_url"],
+                },
+            ),
+            mcp_types.Tool(
+                name="get_file_outline",
+                description=(
+                    "Return a structural outline of a single file — symbols, classes, "
+                    "functions, and their locations."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "repo_url": {
+                            "type": "string",
+                            "description": "Local path or HTTP(S) URL of the repository.",
+                        },
+                        "file_path": {
+                            "type": "string",
+                            "description": "Relative path of the file within the repository.",
+                        },
+                    },
+                    "required": ["repo_url", "file_path"],
+                },
+            ),
+            mcp_types.Tool(
+                name="search_symbols",
+                description=(
+                    "Search for symbols (functions, classes, variables) in a repository "
+                    "by name, kind, and/or language."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "repo_url": {
+                            "type": "string",
+                            "description": "Local path or HTTP(S) URL of the repository.",
+                        },
+                        "query": {
+                            "type": "string",
+                            "description": "Search query to match against symbol names.",
+                        },
+                        "kind": {
+                            "type": "string",
+                            "description": "Filter by symbol kind (e.g. function, class).",
+                        },
+                        "language": {
+                            "type": "string",
+                            "description": "Filter by programming language.",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "default": 20,
+                            "description": "Maximum number of results to return.",
+                        },
+                    },
+                    "required": ["repo_url", "query"],
+                },
+            ),
+            mcp_types.Tool(
+                name="get_symbol",
+                description="Retrieve a single symbol by its stable symbol ID.",
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "repo_url": {
+                            "type": "string",
+                            "description": "Local path or HTTP(S) URL of the repository.",
+                        },
+                        "symbol_id": {
+                            "type": "string",
+                            "description": "Stable symbol identifier.",
+                        },
+                    },
+                    "required": ["repo_url", "symbol_id"],
+                },
+            ),
+            mcp_types.Tool(
+                name="get_symbols_batch",
+                description=(
+                    "Retrieve multiple symbols by their stable symbol IDs in a single call. "
+                    "Maximum 50 IDs per request."
+                ),
+                inputSchema={
+                    "type": "object",
+                    "properties": {
+                        "repo_url": {
+                            "type": "string",
+                            "description": "Local path or HTTP(S) URL of the repository.",
+                        },
+                        "symbol_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "List of stable symbol identifiers (max 50).",
+                        },
+                    },
+                    "required": ["repo_url", "symbol_ids"],
+                },
+            ),
         ]
 
     @server.call_tool()  # pyright: ignore[reportUnusedFunction]
@@ -220,6 +465,38 @@ def build_server() -> Any:
             dims: str = arguments.get("dimensions", "api_surface,error_handling")
             result_text = await loop.run_in_executor(
                 None, handle_compare_repos, repo_a, repo_b, dims
+            )
+        elif name == "get_file_tree":
+            repo_url = arguments["repo_url"]
+            max_depth: int = int(arguments.get("max_depth", 5))
+            language: str | None = arguments.get("language")
+            result_text = await loop.run_in_executor(
+                None, handle_get_file_tree, repo_url, max_depth, language
+            )
+        elif name == "get_file_outline":
+            repo_url = arguments["repo_url"]
+            file_path: str = arguments["file_path"]
+            result_text = await loop.run_in_executor(
+                None, handle_get_file_outline, repo_url, file_path
+            )
+        elif name == "search_symbols":
+            repo_url = arguments["repo_url"]
+            sym_query: str = arguments["query"]
+            kind: str | None = arguments.get("kind")
+            language = arguments.get("language")
+            limit: int = int(arguments.get("limit", 20))
+            result_text = await loop.run_in_executor(
+                None, handle_search_symbols, repo_url, sym_query, kind, language, limit
+            )
+        elif name == "get_symbol":
+            repo_url = arguments["repo_url"]
+            symbol_id: str = arguments["symbol_id"]
+            result_text = await loop.run_in_executor(None, handle_get_symbol, repo_url, symbol_id)
+        elif name == "get_symbols_batch":
+            repo_url = arguments["repo_url"]
+            symbol_ids: list[str] = arguments["symbol_ids"]
+            result_text = await loop.run_in_executor(
+                None, handle_get_symbols_batch, repo_url, symbol_ids
             )
         else:
             raise ValueError(f"Unknown tool: {name!r}")

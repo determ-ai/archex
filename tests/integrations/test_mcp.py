@@ -270,7 +270,7 @@ class TestBuildServer:
         assert mcp_types.CallToolRequest in server.request_handlers
 
     @pytest.mark.asyncio
-    async def test_list_tools_returns_three_tools(self) -> None:
+    async def test_list_tools_returns_core_tools(self) -> None:
         server = build_server()
         # Call the registered list_tools handler directly
         from mcp import types as mcp_types
@@ -281,7 +281,9 @@ class TestBuildServer:
         result = server_result.root
         assert isinstance(result, mcp_types.ListToolsResult)
         tool_names = {t.name for t in result.tools}
-        assert tool_names == {"analyze_repo", "query_repo", "compare_repos"}
+        assert "analyze_repo" in tool_names
+        assert "query_repo" in tool_names
+        assert "compare_repos" in tool_names
 
     @pytest.mark.asyncio
     async def test_call_tool_analyze_repo(self) -> None:
@@ -378,3 +380,161 @@ class TestBuildServer:
         result = server_result.root
         # Should be an error result (isError=True) or ValidationError for bad tool name
         assert result.isError or isinstance(result, mcp_types.CallToolResult)
+
+    @pytest.mark.asyncio
+    async def test_list_tools_returns_eight_tools(self) -> None:
+        server = build_server()
+        from mcp import types as mcp_types
+
+        handler = server.request_handlers[mcp_types.ListToolsRequest]
+        req = mcp_types.ListToolsRequest(method="tools/list", params=None)
+        server_result = await handler(req)
+        result = server_result.root
+        assert isinstance(result, mcp_types.ListToolsResult)
+        assert len(result.tools) == 8
+        tool_names = {t.name for t in result.tools}
+        assert "get_file_tree" in tool_names
+        assert "get_symbol" in tool_names
+        assert "search_symbols" in tool_names
+
+
+# ---------------------------------------------------------------------------
+# Precision Symbol Tool handler tests
+# ---------------------------------------------------------------------------
+
+from archex.integrations.mcp import (  # noqa: E402
+    handle_get_file_outline,
+    handle_get_file_tree,
+    handle_get_symbol,
+    handle_get_symbols_batch,
+    handle_search_symbols,
+)
+from archex.models import (  # noqa: E402
+    FileOutline,
+    FileTree,
+    SymbolKind,
+    SymbolMatch,
+    SymbolSource,
+)
+
+
+class TestHandleGetFileTree:
+    def test_returns_json_with_meta(self) -> None:
+        tree = FileTree(root="/repo", entries=[], total_files=0, languages={})
+        with patch("archex.integrations.mcp.file_tree", return_value=tree):
+            result = handle_get_file_tree("/fake/repo")
+        import json
+
+        parsed = json.loads(result)
+        assert parsed["content"]["root"] == "/repo"
+        assert "_meta" in parsed
+        assert parsed["_meta"]["tool_name"] == "get_file_tree"
+        assert parsed["_meta"]["strategy"] == "file_tree"
+
+    def test_passes_params(self) -> None:
+        tree = FileTree(root="/repo", entries=[], total_files=0, languages={})
+        with patch("archex.integrations.mcp.file_tree", return_value=tree) as mock:
+            handle_get_file_tree("/fake", max_depth=3, language="python")
+        call_kwargs = mock.call_args[1]
+        assert call_kwargs["max_depth"] == 3
+        assert call_kwargs["language"] == "python"
+
+
+class TestHandleGetFileOutline:
+    def test_returns_json_with_meta(self) -> None:
+        outline = FileOutline(
+            file_path="f.py",
+            language="python",
+            lines=10,
+            symbols=[],
+            token_count_raw=100,
+        )
+        with patch("archex.integrations.mcp.file_outline", return_value=outline):
+            result = handle_get_file_outline("/fake", "f.py")
+        import json
+
+        parsed = json.loads(result)
+        assert parsed["content"]["file_path"] == "f.py"
+        assert "_meta" in parsed
+        assert parsed["_meta"]["tool_name"] == "get_file_outline"
+        assert parsed["_meta"]["tokens_raw_equivalent"] == 100
+
+
+class TestHandleSearchSymbols:
+    def test_returns_json_with_meta(self) -> None:
+        match = SymbolMatch(
+            symbol_id="f.py::foo#function",
+            name="foo",
+            kind=SymbolKind.FUNCTION,
+            file_path="f.py",
+            start_line=1,
+        )
+        with patch("archex.integrations.mcp.search_symbols", return_value=[match]):
+            result = handle_search_symbols("/fake", "foo")
+        import json
+
+        parsed = json.loads(result)
+        assert isinstance(parsed["content"], list)
+        assert len(parsed["content"]) == 1
+        assert parsed["content"][0]["name"] == "foo"
+        assert "_meta" in parsed
+        assert parsed["_meta"]["tool_name"] == "search_symbols"
+
+
+class TestHandleGetSymbol:
+    def test_returns_symbol_json_with_meta(self) -> None:
+        sym = SymbolSource(
+            symbol_id="f.py::foo#function",
+            name="foo",
+            kind=SymbolKind.FUNCTION,
+            file_path="f.py",
+            start_line=1,
+            end_line=3,
+            source="def foo(): pass",
+        )
+        with patch("archex.integrations.mcp.get_symbol", return_value=sym):
+            result = handle_get_symbol("/fake", "f.py::foo#function")
+        import json
+
+        parsed = json.loads(result)
+        assert parsed["content"]["source"] == "def foo(): pass"
+        assert "_meta" in parsed
+        assert parsed["_meta"]["tool_name"] == "get_symbol"
+        assert parsed["_meta"]["strategy"] == "symbol_lookup"
+
+    def test_returns_error_for_not_found(self) -> None:
+        with patch("archex.integrations.mcp.get_symbol", return_value=None):
+            result = handle_get_symbol("/fake", "nonexistent")
+        import json
+
+        parsed = json.loads(result)
+        assert "error" in parsed
+        # Not-found responses don't include _meta
+        assert "_meta" not in parsed
+
+
+class TestHandleGetSymbolsBatch:
+    def test_returns_json_with_meta(self) -> None:
+        sym = SymbolSource(
+            symbol_id="f.py::foo#function",
+            name="foo",
+            kind=SymbolKind.FUNCTION,
+            file_path="f.py",
+            start_line=1,
+            end_line=3,
+            source="def foo(): pass",
+        )
+        with patch("archex.integrations.mcp.get_symbols_batch", return_value=[sym, None]):
+            result = handle_get_symbols_batch("/fake", ["f.py::foo#function", "missing"])
+        import json
+
+        parsed = json.loads(result)
+        assert len(parsed["content"]) == 2
+        assert parsed["content"][0]["name"] == "foo"
+        assert parsed["content"][1] is None
+        assert "_meta" in parsed
+        assert parsed["_meta"]["tool_name"] == "get_symbols_batch"
+
+    def test_rejects_too_many_ids(self) -> None:
+        with pytest.raises(ValueError, match="at most 50"):
+            handle_get_symbols_batch("/fake", ["id"] * 51)

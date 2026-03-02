@@ -9,7 +9,11 @@ from archex.cli.analyze_cmd import analyze_cmd
 from archex.cli.cache_cmd import cache_cmd
 from archex.cli.compare_cmd import compare_cmd
 from archex.cli.mcp_cmd import mcp_cmd
+from archex.cli.outline_cmd import outline_cmd
 from archex.cli.query_cmd import query_cmd
+from archex.cli.symbol_cmd import symbol_cmd
+from archex.cli.symbols_cmd import symbols_cmd
+from archex.cli.tree_cmd import tree_cmd
 
 
 @click.group()
@@ -23,6 +27,10 @@ cli.add_command(query_cmd)
 cli.add_command(compare_cmd)
 cli.add_command(cache_cmd)
 cli.add_command(mcp_cmd)
+cli.add_command(tree_cmd)
+cli.add_command(outline_cmd)
+cli.add_command(symbols_cmd)
+cli.add_command(symbol_cmd)
 
 
 if __name__ == "__main__":
