@@ -188,40 +188,46 @@ def query(
     if cached_db is not None:
         logger.info("Cache hit for %s", cache_key[:12])
         store = IndexStore(cached_db)
-        try:
-            bm25 = BM25Index(store)
-            cached_chunks = store.get_chunks()
-            if cached_chunks:
-                bm25.build(cached_chunks)
-            stored_edges = store.get_edges()
-            graph = DependencyGraph.from_edges(stored_edges)
-
-            vector_results: list[tuple[object, float]] | None = None
-            if index_config.vector:
-                vec_path = cache.vector_path(cache_key)
-                if vec_path.exists():
-                    from archex.index.vector import VectorIndex
-
-                    vec_idx = VectorIndex()
-                    vec_idx.load(vec_path, cached_chunks)
-                    embedder = _get_embedder(index_config)
-                    if embedder is not None:
-                        vector_results = vec_idx.search(question, embedder, top_k=50)  # type: ignore[assignment]
-
-            search_results = bm25.search(question, top_k=50)
-            bundle = assemble_context(
-                search_results=search_results,
-                graph=graph,
-                all_chunks=cached_chunks,
-                question=question,
-                token_budget=token_budget,
-                vector_results=vector_results,  # type: ignore[arg-type]
-                scoring_weights=scoring_weights,
-            )
-            logger.info("query() [cached] completed in %.0fms", _elapsed_ms(t0))
-            return bundle
-        finally:
+        if store.needs_reindex():
+            logger.info("Stale cache (missing symbol_ids) — forcing full re-index")
             store.close()
+            cache.invalidate(cache_key)
+            cached_db = None
+        else:
+            try:
+                bm25 = BM25Index(store)
+                cached_chunks = store.get_chunks()
+                if cached_chunks:
+                    bm25.build(cached_chunks)
+                stored_edges = store.get_edges()
+                graph = DependencyGraph.from_edges(stored_edges)
+
+                vector_results: list[tuple[object, float]] | None = None
+                if index_config.vector:
+                    vec_path = cache.vector_path(cache_key)
+                    if vec_path.exists():
+                        from archex.index.vector import VectorIndex
+
+                        vec_idx = VectorIndex()
+                        vec_idx.load(vec_path, cached_chunks)
+                        embedder = _get_embedder(index_config)
+                        if embedder is not None:
+                            vector_results = vec_idx.search(question, embedder, top_k=50)  # type: ignore[assignment]
+
+                search_results = bm25.search(question, top_k=50)
+                bundle = assemble_context(
+                    search_results=search_results,
+                    graph=graph,
+                    all_chunks=cached_chunks,
+                    question=question,
+                    token_budget=token_budget,
+                    vector_results=vector_results,  # type: ignore[arg-type]
+                    scoring_weights=scoring_weights,
+                )
+                logger.info("query() [cached] completed in %.0fms", _elapsed_ms(t0))
+                return bundle
+            finally:
+                store.close()
 
     # Cache miss — full pipeline
     logger.info("Cache miss — running full pipeline")

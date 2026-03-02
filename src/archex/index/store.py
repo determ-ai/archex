@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS chunks (
     token_count INTEGER DEFAULT 0,
     symbol_id TEXT,
     qualified_name TEXT,
-    visibility TEXT,
+    visibility TEXT DEFAULT 'public',
     signature TEXT,
     docstring TEXT
 );
@@ -254,6 +254,15 @@ class IndexStore:
         row = cur.fetchone()
         return str(row[0]) if row else None
 
+    def needs_reindex(self) -> bool:
+        """Return True if the store contains chunks without symbol_ids (pre-stable-ID data)."""
+        return self.get_metadata("needs_reindex") == "true"
+
+    def clear_reindex_flag(self) -> None:
+        """Clear the needs_reindex flag after a successful full re-index."""
+        self._conn.execute("DELETE FROM metadata WHERE key = 'needs_reindex'")
+        self._conn.commit()
+
     def _migrate_schema(self) -> None:
         cur = self._conn.execute("PRAGMA table_info(chunks)")
         columns = {row[1] for row in cur.fetchall()}
@@ -269,6 +278,12 @@ class IndexStore:
             + _CREATE_IDX_CHUNKS_VISIBILITY
             + _CREATE_SYMBOLS_FTS
         )
+        # Set schema version and detect stale data needing re-index
+        self.set_metadata("schema_version", "2")
+        cur = self._conn.execute("SELECT COUNT(*) FROM chunks WHERE symbol_id IS NULL")
+        null_count = cur.fetchone()[0]
+        if null_count > 0:
+            self.set_metadata("needs_reindex", "true")
         self._conn.commit()
 
     @property

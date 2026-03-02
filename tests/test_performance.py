@@ -354,6 +354,7 @@ class TestQueryCacheSkipsParse:
         store = IndexStore(db_path)
         chunk = CodeChunk(
             id="t.py:f:1",
+            symbol_id="t.py::f#function",
             content="def f(): pass",
             file_path="t.py",
             start_line=1,

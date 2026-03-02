@@ -274,3 +274,85 @@ def test_search_symbols(store: IndexStore) -> None:
 def test_search_symbols_no_match(store: IndexStore) -> None:
     store.insert_chunks(SAMPLE_CHUNKS)
     assert store.search_symbols("nonexistent_xyz") == []
+
+
+# ---------------------------------------------------------------------------
+# needs_reindex / schema_version
+# ---------------------------------------------------------------------------
+
+
+def test_fresh_store_does_not_need_reindex(store: IndexStore) -> None:
+    assert store.needs_reindex() is False
+
+
+def test_fresh_store_has_schema_version(store: IndexStore) -> None:
+    assert store.get_metadata("schema_version") == "2"
+
+
+def test_migrated_store_with_null_symbol_ids_needs_reindex(tmp_path: Path) -> None:
+    import sqlite3
+
+    db = tmp_path / "old.db"
+    conn = sqlite3.connect(str(db))
+    conn.executescript("""
+        CREATE TABLE chunks (
+            id TEXT PRIMARY KEY,
+            content TEXT NOT NULL,
+            file_path TEXT NOT NULL,
+            start_line INTEGER NOT NULL,
+            end_line INTEGER NOT NULL,
+            symbol_name TEXT,
+            symbol_kind TEXT,
+            language TEXT NOT NULL,
+            imports_context TEXT DEFAULT '',
+            token_count INTEGER DEFAULT 0
+        );
+        CREATE TABLE edges (
+            source TEXT NOT NULL, target TEXT NOT NULL,
+            kind TEXT NOT NULL, location TEXT
+        );
+        CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    """)
+    conn.execute(
+        "INSERT INTO chunks (id, content, file_path, start_line, end_line, "
+        "symbol_name, symbol_kind, language) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("f.py:foo:1", "def foo(): pass", "f.py", 1, 1, "foo", "function", "python"),
+    )
+    conn.commit()
+    conn.close()
+
+    with IndexStore(db) as s:
+        assert s.needs_reindex() is True
+        assert s.get_metadata("schema_version") == "2"
+
+
+def test_clear_reindex_flag(tmp_path: Path) -> None:
+    import sqlite3
+
+    db = tmp_path / "old2.db"
+    conn = sqlite3.connect(str(db))
+    conn.executescript("""
+        CREATE TABLE chunks (
+            id TEXT PRIMARY KEY, content TEXT NOT NULL, file_path TEXT NOT NULL,
+            start_line INTEGER NOT NULL, end_line INTEGER NOT NULL,
+            symbol_name TEXT, symbol_kind TEXT, language TEXT NOT NULL,
+            imports_context TEXT DEFAULT '', token_count INTEGER DEFAULT 0
+        );
+        CREATE TABLE edges (
+            source TEXT NOT NULL, target TEXT NOT NULL,
+            kind TEXT NOT NULL, location TEXT
+        );
+        CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+    """)
+    conn.execute(
+        "INSERT INTO chunks (id, content, file_path, start_line, end_line, "
+        "symbol_name, symbol_kind, language) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        ("f.py:foo:1", "def foo(): pass", "f.py", 1, 1, "foo", "function", "python"),
+    )
+    conn.commit()
+    conn.close()
+
+    with IndexStore(db) as s:
+        assert s.needs_reindex() is True
+        s.clear_reindex_flag()
+        assert s.needs_reindex() is False
