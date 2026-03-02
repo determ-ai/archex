@@ -74,6 +74,26 @@ def test_query_error_handling(python_simple_repo: Path) -> None:
     assert "Query failed" in result.output
 
 
+def test_query_success_outputs_prompt(python_simple_repo: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        ["query", str(python_simple_repo), "what functions exist?"],
+    )
+    assert result.exit_code == 0, result.output
+    assert len(result.output.strip()) > 0
+
+
+def test_query_timing_flag(python_simple_repo: Path) -> None:
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        ["query", str(python_simple_repo), "what functions exist?", "--timing"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "Timing:" in result.output
+
+
 def test_compare_error_handling() -> None:
     from unittest.mock import patch
 
@@ -92,6 +112,33 @@ def test_compare_type_check_raises_type_error() -> None:
     # Test that non-ComparisonResult raises TypeError
     with pytest.raises(TypeError, match="Expected ComparisonResult"):
         render_comparison_markdown({"not": "a_comparison_result"})
+
+
+class TestMcpCmd:
+    def test_mcp_import_error_raises_click_exception(self) -> None:
+        from unittest.mock import patch
+
+        runner = CliRunner()
+        with patch.dict("sys.modules", {"archex.integrations.mcp": None}):
+            result = runner.invoke(cli, ["mcp"])
+        assert result.exit_code != 0
+        assert "mcp" in result.output.lower()
+
+    def test_mcp_runs_stdio_server(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        mock_run_stdio = MagicMock()
+        mock_mcp_module = MagicMock()
+        mock_mcp_module.run_stdio_server = mock_run_stdio
+
+        runner = CliRunner()
+        with (
+            patch.dict("sys.modules", {"archex.integrations.mcp": mock_mcp_module}),
+            patch("archex.cli.mcp_cmd.asyncio.run") as mock_asyncio_run,
+        ):
+            result = runner.invoke(cli, ["mcp"])
+        assert result.exit_code == 0, result.output
+        mock_asyncio_run.assert_called_once_with(mock_run_stdio())
 
 
 class TestCacheList:

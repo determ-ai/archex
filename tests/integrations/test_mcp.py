@@ -209,6 +209,46 @@ class TestHandleCompareRepos:
 # ---------------------------------------------------------------------------
 
 
+class TestBuildServerImportError:
+    def test_build_server_raises_import_error_when_mcp_missing(self) -> None:
+        import builtins
+        from typing import Any
+
+        original_import: Any = builtins.__import__
+
+        def mock_import(name: str, *args: Any, **kwargs: Any) -> object:
+            if name.startswith("mcp"):
+                raise ImportError(f"No module named '{name}'")
+            return original_import(name, *args, **kwargs)
+
+        with (
+            patch("builtins.__import__", side_effect=mock_import),
+            pytest.raises(ImportError, match="mcp"),
+        ):
+            build_server()
+
+
+class TestRunStdioServer:
+    @pytest.mark.asyncio
+    async def test_run_stdio_server_import_error(self) -> None:
+        """run_stdio_server raises ImportError when mcp.server.stdio is missing."""
+        import builtins
+        from typing import Any
+
+        original_import: Any = builtins.__import__
+
+        def mock_import(name: str, *args: Any, **kwargs: Any) -> object:
+            if name == "mcp.server.stdio":
+                raise ImportError(f"No module named '{name}'")
+            return original_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=mock_import):
+            from archex.integrations.mcp import run_stdio_server
+
+            with pytest.raises(ImportError, match="mcp"):
+                await run_stdio_server()
+
+
 class TestBuildServer:
     def test_returns_server_instance(self) -> None:
         from mcp.server import Server
@@ -258,6 +298,55 @@ class TestBuildServer:
                 ),
             )
             # Force list_tools to populate tool cache
+            list_handler = server.request_handlers[mcp_types.ListToolsRequest]
+            await list_handler(mcp_types.ListToolsRequest(method="tools/list", params=None))
+
+            server_result = await handler(req)
+            result = server_result.root
+            assert isinstance(result, mcp_types.CallToolResult)
+            assert len(result.content) == 1
+            assert result.content[0].type == "text"
+
+    @pytest.mark.asyncio
+    async def test_call_tool_query_repo(self) -> None:
+        with patch(
+            "archex.integrations.mcp.handle_query_repo", return_value="<context>result</context>"
+        ):
+            server = build_server()
+            from mcp import types as mcp_types
+
+            handler = server.request_handlers[mcp_types.CallToolRequest]
+            req = mcp_types.CallToolRequest(
+                method="tools/call",
+                params=mcp_types.CallToolRequestParams(
+                    name="query_repo",
+                    arguments={"repo_url": "/fake", "question": "what?", "budget": 4000},
+                ),
+            )
+            list_handler = server.request_handlers[mcp_types.ListToolsRequest]
+            await list_handler(mcp_types.ListToolsRequest(method="tools/list", params=None))
+
+            server_result = await handler(req)
+            result = server_result.root
+            assert isinstance(result, mcp_types.CallToolResult)
+            assert len(result.content) == 1
+            assert result.content[0].type == "text"
+
+    @pytest.mark.asyncio
+    async def test_call_tool_compare_repos(self) -> None:
+        mock_return = '{"repo_a": {}, "repo_b": {}}'
+        with patch("archex.integrations.mcp.handle_compare_repos", return_value=mock_return):
+            server = build_server()
+            from mcp import types as mcp_types
+
+            handler = server.request_handlers[mcp_types.CallToolRequest]
+            req = mcp_types.CallToolRequest(
+                method="tools/call",
+                params=mcp_types.CallToolRequestParams(
+                    name="compare_repos",
+                    arguments={"repo_a": "/a", "repo_b": "/b", "dimensions": "api_surface"},
+                ),
+            )
             list_handler = server.request_handlers[mcp_types.ListToolsRequest]
             await list_handler(mcp_types.ListToolsRequest(method="tools/list", params=None))
 

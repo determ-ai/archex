@@ -164,3 +164,43 @@ class TestArchexRetrieverLlamaIndex:
         assert len(nodes) == 3
         assert nodes[2].node.text == "fn f2() {}"
         assert nodes[2].score == pytest.approx(0.2)
+
+
+def test_llamaindex_stub_when_unavailable() -> None:
+    """Cover the ImportError branch that defines the _LIBase stub class."""
+    import builtins
+    import importlib
+    import sys
+    from typing import Any
+
+    # Save llama_index-related modules
+    saved: dict[str, object] = {}
+    for key in list(sys.modules):
+        if "llama_index" in key or "llamaindex" in key:
+            saved[key] = sys.modules.pop(key)
+
+    # Also remove the archex integration module so reload works
+    archex_li_key = "archex.integrations.llamaindex"
+    if archex_li_key in sys.modules:
+        saved[archex_li_key] = sys.modules.pop(archex_li_key)
+
+    original_import = builtins.__import__
+
+    def mock_import(  # pyright: ignore[reportExplicitAny]
+        name: str, *args: Any, **kwargs: Any
+    ) -> object:
+        if "llama_index" in name:
+            raise ImportError(f"No module named '{name}'")
+        return original_import(name, *args, **kwargs)
+
+    try:
+        builtins.__import__ = mock_import  # type: ignore[assignment]
+        li = importlib.import_module("archex.integrations.llamaindex")
+        assert li._llamaindex_available is False  # pyright: ignore[reportPrivateUsage]
+    finally:
+        builtins.__import__ = original_import  # type: ignore[assignment]
+        # Restore saved modules
+        sys.modules.update(saved)  # type: ignore[arg-type]
+        # Reload to restore normal state
+        if archex_li_key in sys.modules:
+            importlib.reload(sys.modules[archex_li_key])

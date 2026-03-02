@@ -6,7 +6,7 @@
 
 ## Directory Layout
 
-```
+```text
 archex/
 ├── src/archex/          # Library source
 │   ├── cli/             # Click CLI entrypoint (archex.cli.main:cli)

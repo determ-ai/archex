@@ -387,6 +387,116 @@ class TestQueryCacheSkipsParse:
             query(source, "what?", config=config)
         mock_es.assert_not_called()
 
+    def test_query_invalidates_stale_cache(self, tmp_path: Path, python_simple_repo: Path) -> None:
+        """Cache with needs_reindex flag is invalidated and falls through to full pipeline."""
+        from archex.index.bm25 import BM25Index
+
+        db_path = tmp_path / "stale.db"
+        store = IndexStore(db_path)
+        # Insert a chunk with no symbol_id to simulate pre-upgrade (schema v1) data.
+        # The migration in IndexStore._migrate_schema will detect the NULL and set
+        # needs_reindex=true in the metadata table.
+        chunk = CodeChunk(
+            id="t.py:_module:1",
+            symbol_id=None,  # NULL symbol_id triggers needs_reindex
+            content="x = 1",
+            file_path="t.py",
+            start_line=1,
+            end_line=1,
+            language="python",
+        )
+        store.insert_chunks([chunk])
+        bm25 = BM25Index(store)
+        bm25.build([chunk])
+        store.conn.execute("PRAGMA wal_checkpoint(FULL)")
+        store.close()
+
+        # Re-open the store to force _migrate_schema which sets needs_reindex flag.
+        store2 = IndexStore(db_path)
+        assert store2.needs_reindex(), "Expected needs_reindex flag after NULL symbol_id migration"
+        store2.close()
+
+        cache_dir = tmp_path / "cache"
+        cache_dir.mkdir()
+        cache = CacheManager(cache_dir=str(cache_dir))
+        source = RepoSource(local_path=str(python_simple_repo))
+        with patch("archex.cache.CacheManager._git_head", return_value=None):
+            key = cache.cache_key(source)
+        cache.put(key, db_path)
+
+        config = Config(cache=True, cache_dir=str(cache_dir))
+        with (
+            patch("archex.api.extract_symbols", wraps=extract_symbols) as mock_es,
+            patch("archex.cache.CacheManager._git_head", return_value=None),
+        ):
+            from archex.api import query
+
+            query(source, "what?", config=config)
+        # extract_symbols must have been called because the stale cache was invalidated.
+        mock_es.assert_called()
+
+
+class TestGetEmbedder:
+    """Tests for api._get_embedder (lines 319-332)."""
+
+    def test_returns_none_when_no_embedder(self) -> None:
+        from archex.api import _get_embedder
+        from archex.models import IndexConfig
+
+        assert _get_embedder(IndexConfig()) is None
+        assert _get_embedder(IndexConfig(embedder="")) is None
+
+    def test_returns_none_for_unknown_embedder(self) -> None:
+        from archex.api import _get_embedder
+        from archex.models import IndexConfig
+
+        assert _get_embedder(IndexConfig(embedder="custom_api")) is None
+
+    def test_creates_nomic_embedder(self) -> None:
+        from archex.api import _get_embedder
+        from archex.models import IndexConfig
+
+        mock_nomic = MagicMock()
+        with patch("archex.index.embeddings.nomic.NomicCodeEmbedder", mock_nomic):
+            result = _get_embedder(IndexConfig(embedder="nomic"))
+        mock_nomic.assert_called_once()
+        assert result is mock_nomic.return_value
+
+    def test_creates_sentence_transformers_embedder(self) -> None:
+        from archex.api import _get_embedder
+        from archex.models import IndexConfig
+
+        mock_st = MagicMock()
+        with patch("archex.index.embeddings.sentence_tf.SentenceTransformerEmbedder", mock_st):
+            result = _get_embedder(IndexConfig(embedder="sentence_transformers"))
+        mock_st.assert_called_once()
+        assert result is mock_st.return_value
+
+
+class TestAnalyzeDefaultConfig:
+    """Test that analyze() creates default Config when None is passed (line 91)."""
+
+    def test_analyze_with_none_config(self, python_simple_repo: Path) -> None:
+        from archex.api import analyze
+        from archex.models import RepoSource
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        profile = analyze(source, config=None)
+        assert profile is not None
+        assert profile.stats.total_files > 0
+
+
+class TestQueryDefaultConfig:
+    """Test that query() creates default Config when None is passed (line 178)."""
+
+    def test_query_with_none_config(self, python_simple_repo: Path) -> None:
+        from archex.api import query
+        from archex.models import RepoSource
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        result = query(source, "what functions exist?", config=None)
+        assert result is not None
+
 
 class TestCompareParallel:
     def test_both_analyses_called(self) -> None:
