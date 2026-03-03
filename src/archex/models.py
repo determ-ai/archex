@@ -103,6 +103,7 @@ class Config(BaseModel):
     cache_dir: str = "~/.archex/cache"
     max_file_size: int = 10_000_000
     parallel: bool = False
+    strict: bool = False
     delta_threshold: float = 0.5
 
 
