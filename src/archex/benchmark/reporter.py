@@ -16,12 +16,8 @@ def format_markdown(report: BenchmarkReport) -> str:
     lines.append(f"**Question:** {report.question}")
     lines.append(f"**Baseline tokens:** {report.baseline_tokens:,}")
     lines.append("")
-    lines.append(
-        "| Strategy | Tokens | Savings | Recall | Precision | Files | Time (ms) |"
-    )
-    lines.append(
-        "|----------|--------|---------|--------|-----------|-------|-----------|"
-    )
+    lines.append("| Strategy | Tokens | Savings | Recall | Precision | Files | Time (ms) |")
+    lines.append("|----------|--------|---------|--------|-----------|-------|-----------|")
     for r in report.results:
         lines.append(
             f"| {r.strategy.value} | {r.tokens_total:,} | {r.savings_vs_raw:.1f}% "
@@ -71,8 +67,7 @@ def format_summary(reports: list[BenchmarkReport]) -> str:
         avg_recall = sum(recalls_list) / count
         avg_savings = sum(savings_list) / count
         lines.append(
-            f"| {name} | {avg_tokens:,.0f} | {avg_savings:.1f}% "
-            f"| {avg_recall:.2f} | {count} |"
+            f"| {name} | {avg_tokens:,.0f} | {avg_savings:.1f}% | {avg_recall:.2f} | {count} |"
         )
 
     lines.append("")

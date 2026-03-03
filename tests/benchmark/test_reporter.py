@@ -94,13 +94,17 @@ class TestFormatSummary:
         assert "archex_query" in summary
 
     def test_multi_report_aggregation(self) -> None:
-        r1 = _make_report([
-            _make_result(Strategy.RAW_FILES, tokens=2000),
-            _make_result(Strategy.ARCHEX_QUERY, tokens=500, savings=75.0, recall=0.8),
-        ])
-        r2 = _make_report([
-            _make_result(Strategy.RAW_FILES, tokens=3000),
-            _make_result(Strategy.ARCHEX_QUERY, tokens=600, savings=80.0, recall=0.9),
-        ])
+        r1 = _make_report(
+            [
+                _make_result(Strategy.RAW_FILES, tokens=2000),
+                _make_result(Strategy.ARCHEX_QUERY, tokens=500, savings=75.0, recall=0.8),
+            ]
+        )
+        r2 = _make_report(
+            [
+                _make_result(Strategy.RAW_FILES, tokens=3000),
+                _make_result(Strategy.ARCHEX_QUERY, tokens=600, savings=80.0, recall=0.9),
+            ]
+        )
         summary = format_summary([r1, r2])
         assert "**Tasks:** 2" in summary

@@ -75,7 +75,8 @@ class TestReportCommand:
 
     def test_json_output(self, runner: CliRunner, results_dir: Path) -> None:
         result = runner.invoke(
-            benchmark_cmd, ["report", "--format", "json", "--input", str(results_dir)],
+            benchmark_cmd,
+            ["report", "--format", "json", "--input", str(results_dir)],
         )
         assert result.exit_code == 0
         data = json.loads(result.output)

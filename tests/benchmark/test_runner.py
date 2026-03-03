@@ -37,7 +37,8 @@ class TestAvailableStrategies:
 
 class TestRunBenchmark:
     def test_run_with_fixture_repo(
-        self, fixture_task: tuple[BenchmarkTask, Path],
+        self,
+        fixture_task: tuple[BenchmarkTask, Path],
     ) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
@@ -50,7 +51,8 @@ class TestRunBenchmark:
         assert len(report.results) == 2
 
     def test_baseline_tokens_from_raw_files(
-        self, fixture_task: tuple[BenchmarkTask, Path],
+        self,
+        fixture_task: tuple[BenchmarkTask, Path],
     ) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
@@ -63,7 +65,8 @@ class TestRunBenchmark:
         assert report.baseline_tokens == raw_result.tokens_total
 
     def test_savings_backfill(
-        self, fixture_task: tuple[BenchmarkTask, Path],
+        self,
+        fixture_task: tuple[BenchmarkTask, Path],
     ) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
@@ -80,7 +83,8 @@ class TestRunBenchmark:
                 assert isinstance(r.savings_vs_raw, float)
 
     def test_strategy_filtering(
-        self, fixture_task: tuple[BenchmarkTask, Path],
+        self,
+        fixture_task: tuple[BenchmarkTask, Path],
     ) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
@@ -92,7 +96,8 @@ class TestRunBenchmark:
         assert report.results[0].strategy == Strategy.RAW_FILES
 
     def test_symbol_lookup_skipped_gracefully(
-        self, fixture_task: tuple[BenchmarkTask, Path],
+        self,
+        fixture_task: tuple[BenchmarkTask, Path],
     ) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
@@ -104,9 +109,9 @@ class TestRunBenchmark:
         assert len(report.results) == 1
         assert report.results[0].strategy == Strategy.RAW_FILES
 
-
     def test_default_strategies_used_when_none(
-        self, fixture_task: tuple[BenchmarkTask, Path],
+        self,
+        fixture_task: tuple[BenchmarkTask, Path],
     ) -> None:
         """strategies=None should use AVAILABLE_STRATEGIES."""
         task, repo_path = fixture_task
@@ -118,7 +123,8 @@ class TestRunBenchmark:
         assert Strategy.ARCHEX_QUERY in strategy_names
 
     def test_no_baseline_when_raw_files_omitted(
-        self, fixture_task: tuple[BenchmarkTask, Path],
+        self,
+        fixture_task: tuple[BenchmarkTask, Path],
     ) -> None:
         """Without raw_files, baseline_tokens=0 and savings stay 0."""
         task, repo_path = fixture_task
@@ -131,7 +137,8 @@ class TestRunBenchmark:
         assert report.results[0].savings_vs_raw == 0.0
 
     def test_unknown_strategy_runner_skipped(
-        self, fixture_task: tuple[BenchmarkTask, Path],
+        self,
+        fixture_task: tuple[BenchmarkTask, Path],
     ) -> None:
         """A strategy missing from STRATEGY_RUNNERS is logged and skipped."""
         from archex.benchmark.strategies import STRATEGY_RUNNERS
@@ -164,7 +171,8 @@ class TestCloneAtCommit:
         original_run = subprocess.run
 
         def mock_run(
-            cmd: list[str], **kwargs: object,
+            cmd: list[str],
+            **kwargs: object,
         ) -> subprocess.CompletedProcess[str]:
             calls.append(cmd)
             return subprocess.CompletedProcess(cmd, 0, "", "")
@@ -186,10 +194,13 @@ class TestCloneAtCommit:
 
         # Cleanup
         import shutil
+
         shutil.rmtree(path, ignore_errors=True)
 
     def test_cleanup_on_needs_cleanup(
-        self, python_simple_repo: Path, tmp_path: Path,
+        self,
+        python_simple_repo: Path,
+        tmp_path: Path,
     ) -> None:
         """When needs_cleanup=True, repo dir is removed after run_benchmark."""
         import archex.benchmark.runner as runner_mod
@@ -236,7 +247,9 @@ expected_files:
         return tasks_dir
 
     def test_run_all_with_task_dir(
-        self, python_simple_repo: Path, tmp_path: Path,
+        self,
+        python_simple_repo: Path,
+        tmp_path: Path,
     ) -> None:
         from archex.benchmark.runner import run_all
 
@@ -244,6 +257,7 @@ expected_files:
         output_dir = tmp_path / "results"
 
         import archex.benchmark.runner as runner_mod
+
         original = runner_mod._clone_at_commit
 
         def _fake_clone(repo_slug: str, commit: str) -> tuple[Path, bool]:
@@ -277,7 +291,9 @@ expected_files:
             )
 
     def test_task_filter_selects_matching(
-        self, python_simple_repo: Path, tmp_path: Path,
+        self,
+        python_simple_repo: Path,
+        tmp_path: Path,
     ) -> None:
         from archex.benchmark.runner import run_all
 
@@ -294,6 +310,7 @@ expected_files:
         output_dir = tmp_path / "results"
 
         import archex.benchmark.runner as runner_mod
+
         original = runner_mod._clone_at_commit
 
         def _fake_clone(repo_slug: str, commit: str) -> tuple[Path, bool]:

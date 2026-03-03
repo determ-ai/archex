@@ -84,7 +84,8 @@ def run_benchmark(
             for result in results:
                 if result.strategy != Strategy.RAW_FILES:
                     result.savings_vs_raw = round(
-                        (1 - result.tokens_total / baseline_tokens) * 100, 1,
+                        (1 - result.tokens_total / baseline_tokens) * 100,
+                        1,
                     )
 
         return BenchmarkReport(
