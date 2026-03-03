@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.5.0 (2026-03-04)
+
+### Delta Indexing
+
+- **3-path cache decision:** `_ensure_index` checks exact cache hit → delta update → full re-index
+- **`compute_delta()`:** Git diff (`--name-status -M`) between commits produces `DeltaManifest` with adds, modifies, deletes, renames
+- **`apply_delta()`:** Surgical store update — renames, deletions, re-parse changed files, atomic store upsert, graph update, BM25 rebuild, metadata refresh
+- **`compute_mtime_delta()`:** Mtime-based fallback for non-git repos
+- **`delta_threshold` config:** If >50% files changed, fall back to full re-index (default 0.5)
+
+### Language Expansion
+
+- **Java adapter:** Visibility defaults to INTERNAL (package-private), interface members default to PUBLIC, full symbol/import/entry-point support
+- **Kotlin adapter:** Visibility defaults to PUBLIC, extension functions, companion objects, data/sealed classes
+- **C# adapter:** Namespace-qualified names, 6 visibility levels mapped to 3, properties/events/delegates, top-level statement detection
+- **Swift adapter:** Default INTERNAL visibility, extensions, actors, protocols, `@main`/`@UIApplicationMain`/`XCTestCase` entry points
+- **Shared JVM helpers:** `_jvm_helpers.py` with `resolve_jvm_import`, `map_jvm_visibility`, `detect_jvm_convention`
+
+### Infrastructure
+
+- **Engine fallback:** `_try_language_pack()` in `engine.py` for grammars not available as standalone (Swift)
+- **Pipeline service:** `pipeline/service.py` module
+- **Grammar deps:** `tree-sitter-java`, `tree-sitter-kotlin`, `tree-sitter-c-sharp`, `tree-sitter-language-pack` (optional extra)
+
+### Models
+
+- **`strict` field on Config**
+- **Delta models:** `ChangeStatus` (StrEnum), `FileChange`, `DeltaManifest` (with computed properties), `DeltaMeta`
+- **`DeltaIndexError`** exception
+
+### Store
+
+- **`delete_chunks_for_files()`** — remove chunks by file path
+- **`delete_edges_for_files()`** — remove edges by file path
+- **`update_file_paths()`** — rename file paths in chunks/edges
+- **`delete_and_insert_for_files()`** — atomic delete + re-insert for changed files
+
+### Stats
+
+- 1274 tests, 92% coverage
+
 ## 0.4.0 (2026-03-01)
 
 ### Refactoring
