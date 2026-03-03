@@ -6,13 +6,13 @@ archex is a Python library and CLI that transforms any Git repository into struc
 
 ## Features
 
-- **4 language adapters** — Python, TypeScript/JavaScript, Go, Rust (tree-sitter AST parsing), extensible via entry points
+- **8 language adapters** — Python, TypeScript/JavaScript, Go, Rust, Java, Kotlin, C#, Swift (tree-sitter AST parsing), extensible via entry points
 - **3 public APIs** — `analyze()`, `query()`, `compare()`
 - **Hybrid retrieval** — BM25 keyword search + optional vector embeddings with reciprocal rank fusion
 - **Token budget assembly** — AST-aware chunking, dependency-graph expansion, greedy bin-packing with configurable `ScoringWeights`
 - **Structural analysis** — module detection (Louvain), pattern recognition (extensible `PatternRegistry`), interface extraction
 - **Cross-repo comparison** — 6 architectural dimensions, no LLM required
-- **Performance** — cache-first query (skips parse on cache hit), parallel parsing, parallel compare, git-aware cache keys
+- **Performance** — cache-first query (skips parse on cache hit), delta indexing (surgical re-index via git diff), parallel parsing, parallel compare, git-aware cache keys
 - **Extensibility** — plugin APIs for language adapters, pattern detectors, chunkers, and scoring weights via entry points and protocols
 - **Security** — input validation on git URLs/branches, FTS5 query escaping, cache key validation, `allow_pickle=False` for vector persistence
 - **LLM-optional** — entire structural pipeline runs without API calls; LLM enrichment is opt-in
@@ -35,6 +35,7 @@ uv add archex
 | `archex[mcp]`          | MCP server for agent integration         |
 | `archex[langchain]`    | LangChain retriever integration          |
 | `archex[llamaindex]`   | LlamaIndex retriever integration         |
+| `archex[language-pack]`| Additional grammars via tree-sitter-language-pack (Swift) |
 | `archex[all]`          | All optional dependencies                |
 
 ## Quick Start
@@ -225,7 +226,7 @@ git clone https://github.com/Mathews-Tom/archex.git
 cd archex
 uv sync --all-extras
 
-# Run tests (641 tests, 90% coverage)
+# Run tests (1274 tests, 92% coverage)
 uv run pytest
 
 # Lint and format

@@ -89,7 +89,7 @@ The primary value proposition is _getting the right code into the right context 
 
 Tree-sitter provides language-agnostic AST parsing across 100+ languages. archex's core algorithms operate on abstract symbol types and AST node categories, not language-specific heuristics. Language-specific knowledge (import conventions, module systems, entry point patterns) is isolated behind a `LanguageAdapter` protocol with ~150 lines per language.
 
-**Shipped adapters:** Python, TypeScript/JavaScript, Go, Rust.
+**Shipped adapters:** Python, TypeScript/JavaScript, Go, Rust, Java, Kotlin, C#, Swift.
 
 ### 3.5 No Magic
 
@@ -294,14 +294,17 @@ archex follows a minimal-dependency strategy:
 
 **Optional extras:**
 
-| Extra                  | Dependencies                | Purpose                                      |
-| ---------------------- | --------------------------- | -------------------------------------------- |
-| `archex[vector]`       | `onnxruntime`, `tokenizers` | Local embedding via Nomic Embed Code (~50MB) |
-| `archex[vector-torch]` | `sentence-transformers`     | Full torch-backed embeddings (~2GB)          |
-| `archex[voyage]`       | `voyageai`                  | Voyage Code API embeddings                   |
-| `archex[openai]`       | `openai`                    | OpenAI API embeddings + LLM enrichment       |
-| `archex[anthropic]`    | `anthropic`                 | Anthropic API LLM enrichment                 |
-| `archex[all]`          | All optional deps           | Everything                                   |
+| Extra                   | Dependencies                | Purpose                                      |
+| ----------------------- | --------------------------- | -------------------------------------------- |
+| `archex[vector]`        | `onnxruntime`, `tokenizers` | Local embedding via Nomic Embed Code (~50MB) |
+| `archex[vector-torch]`  | `sentence-transformers`     | Full torch-backed embeddings (~2GB)          |
+| `archex[voyage]`        | `voyageai`                  | Voyage Code API embeddings                   |
+| `archex[openai]`        | `openai`                    | OpenAI API embeddings + LLM enrichment       |
+| `archex[anthropic]`     | `anthropic`                 | Anthropic API LLM enrichment                 |
+| `archex[language-pack]` | `tree-sitter-language-pack` | Additional grammars (Swift)                  |
+| `archex[all]`           | All optional deps           | Everything                                   |
+
+Core grammar dependencies include `tree-sitter-java`, `tree-sitter-kotlin`, and `tree-sitter-c-sharp` in addition to the original four. Swift uses `tree-sitter-language-pack` (optional extra).
 
 No SQLAlchemy, no FastAPI, no heavy frameworks. SQLite via stdlib `sqlite3`. Git operations via `git` CLI (assumed installed). HTTP via stdlib `urllib` where needed.
 

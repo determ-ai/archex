@@ -276,6 +276,10 @@ archex parses code structurally using tree-sitter — no regex, no heuristics, n
 | **TypeScript / JavaScript** | `.ts`, `.tsx`, `.js`, `.jsx` | Functions, classes, methods, types, interfaces, enums, constants             | ES modules, CommonJS, type-only imports, re-exports |
 | **Go**                      | `.go`                        | Functions, methods (pointer/value receivers), structs, interfaces, constants | Package imports with alias support                  |
 | **Rust**                    | `.rs`                        | Functions, structs, enums, traits, impl blocks, constants, macros            | `use` statements, `pub`/`pub(crate)` visibility     |
+| **Java**                    | `.java`                      | Classes, interfaces, enums, methods, fields, annotations                     | Package imports, static imports, wildcard imports   |
+| **Kotlin**                  | `.kt`, `.kts`                | Classes, objects, functions, properties, extensions, companions              | Package imports, alias imports                      |
+| **C#**                      | `.cs`                        | Classes, structs, interfaces, enums, methods, properties, events             | `using` directives, namespace-qualified resolution  |
+| **Swift**                   | `.swift`                     | Classes, structs, enums, protocols, actors, extensions, functions            | `import` declarations                               |
 
 Adapters are extensible via Python entry points — add a new language without modifying archex core.
 
@@ -380,7 +384,7 @@ Your agent now has access to `analyze_repo`, `query_repo`, `compare_repos`, `get
 │          │   │          │   │          │   │          │   │          │
 │ git clone│   │tree-sitter│   │ BM25     │   │ Louvain  │   │ArchProfile│
 │ local    │   │ AST walk │   │ Vector   │   │ Patterns │   │ Context  │
-│ discover │   │ 4 langs  │   │ Dep Graph│   │ Interfaces│   │ Compare  │
+│ discover │   │ 8 langs  │   │ Dep Graph│   │ Interfaces│   │ Compare  │
 └──────────┘   └──────────┘   └──────────┘   └──────────┘   └──────────┘
                                     │
                               ┌─────┴─────┐
@@ -426,7 +430,7 @@ archex is Apache 2.0 licensed. Contributions welcome.
 git clone https://github.com/Mathews-Tom/archex.git
 cd archex
 uv sync --all-extras
-uv run pytest  # 641 tests, 90% coverage
+uv run pytest  # 1274 tests, 92% coverage
 ```
 
 Extensible via entry points: add language adapters and pattern detectors without modifying core.

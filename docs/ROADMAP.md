@@ -35,18 +35,23 @@ gantt
 
     section Phase 7
     Refactor + Test Coverage            :done, p7, 2026-03-01, 1d
+
+    section Enhancements
+    Delta Indexing                       :done, e5, 2026-03-02, 1d
+    Expanded Language Support            :done, e7, 2026-03-03, 2d
 ```
 
-| Phase                              | Duration | Goal                                                                            | Key Deliverable                                          | Status       |
-| ---------------------------------- | -------- | ------------------------------------------------------------------------------- | -------------------------------------------------------- | ------------ |
-| **0 — Scaffold**                   | ~1 week  | Repo, CI, project structure, deps, test harness                                 | Empty but buildable project with full tooling            | ✅ Complete  |
-| **1 — Foundation**                 | ~3 weeks | Parse any Python repo, extract symbols, build dep graph                         | `analyze()` returns structural ArchProfile (Python only) | ✅ Complete  |
-| **2 — Retrieval**                  | ~3 weeks | AST-aware chunking, BM25 index, token-budget context assembly                   | `query()` returns ContextBundle with budget packing      | ✅ Complete  |
-| **3 — Intelligence**               | ~3 weeks | Module detection, pattern recognition, LLM enrichment, TypeScript adapter       | Full `analyze()` with patterns + modules + enrichment    | ✅ Complete  |
-| **4 — Compare + Ship**             | ~3 weeks | Cross-repo comparison, Go/Rust adapters, vector index, CLI polish, PyPI publish | `archex` v0.1.0 on PyPI with 4 language adapters         | ✅ Complete  |
-| **5 — Ecosystem**                  | ~3 weeks | MCP integration, framework adapters, Attest evals, content pipeline             | Integrations with Claude Code, LangChain, CAIRN          | ✅ Complete  |
-| **6 — Harden, Optimize, Polish, Extend** | ~1 week  | Security hardening, performance optimization, code polish, extensibility APIs   | v0.3.0 — 538 tests, 84% coverage, plugin entry points   | ✅ Complete  |
-| **7 — Refactor + Test Coverage**         | ~1 day   | Source simplification, error handling, adapter dedup, 90% test coverage         | v0.4.0 — 641 tests, 90% coverage, shared ts_node module | ✅ Complete  |
+| Phase                                    | Duration | Goal                                                                            | Key Deliverable                                          | Status      |
+| ---------------------------------------- | -------- | ------------------------------------------------------------------------------- | -------------------------------------------------------- | ----------- |
+| **0 — Scaffold**                         | ~1 week  | Repo, CI, project structure, deps, test harness                                 | Empty but buildable project with full tooling            | ✅ Complete |
+| **1 — Foundation**                       | ~3 weeks | Parse any Python repo, extract symbols, build dep graph                         | `analyze()` returns structural ArchProfile (Python only) | ✅ Complete |
+| **2 — Retrieval**                        | ~3 weeks | AST-aware chunking, BM25 index, token-budget context assembly                   | `query()` returns ContextBundle with budget packing      | ✅ Complete |
+| **3 — Intelligence**                     | ~3 weeks | Module detection, pattern recognition, LLM enrichment, TypeScript adapter       | Full `analyze()` with patterns + modules + enrichment    | ✅ Complete |
+| **4 — Compare + Ship**                   | ~3 weeks | Cross-repo comparison, Go/Rust adapters, vector index, CLI polish, PyPI publish | `archex` v0.1.0 on PyPI with 4 language adapters         | ✅ Complete |
+| **5 — Ecosystem**                        | ~3 weeks | MCP integration, framework adapters, Attest evals, content pipeline             | Integrations with Claude Code, LangChain, CAIRN          | ✅ Complete |
+| **6 — Harden, Optimize, Polish, Extend** | ~1 week  | Security hardening, performance optimization, code polish, extensibility APIs   | v0.3.0 — 538 tests, 84% coverage, plugin entry points    | ✅ Complete |
+| **7 — Refactor + Test Coverage**         | ~1 day   | Source simplification, error handling, adapter dedup, 90% test coverage         | v0.4.0 — 641 tests, 90% coverage, shared ts_node module  | ✅ Complete |
+| **Enhancements — Delta + Languages**     | ~3 days  | Delta indexing, Java/Kotlin/C#/Swift adapters, JVM helpers, pipeline service    | v0.5.0 — 1274 tests, 92% coverage, 8 language adapters   | ✅ Complete |
 
 ---
 
@@ -590,13 +595,13 @@ elif strategy == "vector" and vector_index is not None:
 
 #### 4.5 — Documentation + Packaging
 
-| Deliverable           | Details                                                                |
-| --------------------- | ---------------------------------------------------------------------- |
-| **README.md**         | Quick start, installation, usage examples, CLI reference               |
-| **API Reference**     | Docstrings on all public classes and functions                         |
-| **Integration Guide** | Examples for LangChain, LlamaIndex, Claude Code MCP, raw Python        |
-| **CHANGELOG.md**      | v0.1.0 release notes                                                   |
-| **PyPI Publish**      | `uv build` + `uv publish` (manual)                                    |
+| Deliverable           | Details                                                         |
+| --------------------- | --------------------------------------------------------------- |
+| **README.md**         | Quick start, installation, usage examples, CLI reference        |
+| **API Reference**     | Docstrings on all public classes and functions                  |
+| **Integration Guide** | Examples for LangChain, LlamaIndex, Claude Code MCP, raw Python |
+| **CHANGELOG.md**      | v0.1.0 release notes                                            |
+| **PyPI Publish**      | `uv build` + `uv publish` (manual)                              |
 
 ### Phase 4 Acceptance Criteria
 
@@ -694,8 +699,8 @@ Build evaluation datasets and assertions using Attest's graduated assertion pipe
 - [x] MCP server works with Claude Code (install, tool discovery, invocation)
 - [x] LangChain retriever passes LangChain's retriever interface tests
 - [x] LlamaIndex retriever maps RankedChunks to NodeWithScore
-- [ ] Attest eval suite has 10+ test cases with passing assertions — *deferred*
-- [ ] At least 2 content pieces published (LinkedIn + no-magic) — *deferred*
+- [ ] Attest eval suite has 10+ test cases with passing assertions — _deferred_
+- [ ] At least 2 content pieces published (LinkedIn + no-magic) — _deferred_
 - [x] Parse time < 10s for repos with < 500 files
 - [x] Query time < 1s for cached repos
 
@@ -707,55 +712,55 @@ Build evaluation datasets and assertions using Attest's graduated assertion pipe
 
 ### Phase 6a — Harden
 
-| Deliverable | Details |
-| --- | --- |
-| **Git URL validation** | `_validate_url()` restricts to `http://`, `https://`, local paths. `_validate_branch()` rejects injection characters. |
-| **FTS5 query escaping** | Strip non-alphanumeric characters from BM25 query tokens |
-| **Cache key validation** | Enforce `^[0-9a-f]{64}$` pattern, raise `CacheError` on mismatch |
-| **Vector safety** | `allow_pickle=False`, `dtype='U512'` for `.npz` persistence |
-| **File size guard** | `max_file_size` config (default 10MB) in `discover_files()` and `parse_file()` |
-| **Store safety** | `IndexStore.__init__` try/except for connection cleanup on failure |
-| **Parse logging** | `symbols.py` and `imports.py` log warnings on parse failures |
-| **CLI error handling** | API calls wrapped in `try/except ArchexError` → `click.ClickException` |
-| **MCP hardening** | Dimension validation, `get_running_loop()`, embeddings `timeout=30` |
+| Deliverable              | Details                                                                                                               |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| **Git URL validation**   | `_validate_url()` restricts to `http://`, `https://`, local paths. `_validate_branch()` rejects injection characters. |
+| **FTS5 query escaping**  | Strip non-alphanumeric characters from BM25 query tokens                                                              |
+| **Cache key validation** | Enforce `^[0-9a-f]{64}$` pattern, raise `CacheError` on mismatch                                                      |
+| **Vector safety**        | `allow_pickle=False`, `dtype='U512'` for `.npz` persistence                                                           |
+| **File size guard**      | `max_file_size` config (default 10MB) in `discover_files()` and `parse_file()`                                        |
+| **Store safety**         | `IndexStore.__init__` try/except for connection cleanup on failure                                                    |
+| **Parse logging**        | `symbols.py` and `imports.py` log warnings on parse failures                                                          |
+| **CLI error handling**   | API calls wrapped in `try/except ArchexError` → `click.ClickException`                                                |
+| **MCP hardening**        | Dimension validation, `get_running_loop()`, embeddings `timeout=30`                                                   |
 
 ### Phase 6b — Performance
 
-| Deliverable | Details |
-| --- | --- |
+| Deliverable           | Details                                                                       |
+| --------------------- | ----------------------------------------------------------------------------- |
 | **Cache-first query** | `query()` checks cache BEFORE parsing — cache hit skips entire parse pipeline |
-| **Graph round-trip** | `DependencyGraph.from_edges()` reconstructs graph from stored edges |
-| **Batch fetch** | `IndexStore.get_chunks_by_ids()` with `WHERE id IN (...)` |
-| **Parallel config** | `Config.parallel` flag passed to `extract_symbols()` and `parse_imports()` |
-| **Parallel compare** | `ThreadPoolExecutor(max_workers=2)` for concurrent `analyze()` in `compare()` |
-| **O(N) top-k** | `np.argpartition` replaces `np.argsort` in VectorIndex search |
-| **Vector cache** | `CacheManager.vector_path()` persists vector indices across queries |
-| **Centrality cache** | Lazy `_centrality_cache` on `DependencyGraph`, invalidated on mutation |
-| **Git-aware cache** | Cache key includes git HEAD commit hash for local repos |
+| **Graph round-trip**  | `DependencyGraph.from_edges()` reconstructs graph from stored edges           |
+| **Batch fetch**       | `IndexStore.get_chunks_by_ids()` with `WHERE id IN (...)`                     |
+| **Parallel config**   | `Config.parallel` flag passed to `extract_symbols()` and `parse_imports()`    |
+| **Parallel compare**  | `ThreadPoolExecutor(max_workers=2)` for concurrent `analyze()` in `compare()` |
+| **O(N) top-k**        | `np.argpartition` replaces `np.argsort` in VectorIndex search                 |
+| **Vector cache**      | `CacheManager.vector_path()` persists vector indices across queries           |
+| **Centrality cache**  | Lazy `_centrality_cache` on `DependencyGraph`, invalidated on mutation        |
+| **Git-aware cache**   | Cache key includes git HEAD commit hash for local repos                       |
 
 ### Phase 6c — Wire & Polish
 
-| Deliverable | Details |
-| --- | --- |
-| **Hybrid retrieval** | VectorIndex wired into cache-miss query path with RRF |
-| **`resolve_source()`** | Shared utility extracted from 4 inline copies |
-| **Compare CLI routing** | Routes through `api.compare()` instead of manual `analyze()` x2 |
-| **MCP dimension fix** | Corrected dimension names to match `SUPPORTED_DIMENSIONS` |
-| **Dead field removal** | `CodeChunk.module` removed from models, store, and chunker |
-| **RepoSource validator** | `model_validator(mode="after")` requires `url` or `local_path` |
-| **`load_config()`** | Reads `~/.archex/config.toml` via `tomllib` + `ARCHEX_*` env vars |
-| **Provider model IDs** | Centralized in `DEFAULT_MODELS` dict in `config.py` |
-| **Pipeline logging** | INFO-level logging with timing at all pipeline boundaries |
+| Deliverable              | Details                                                           |
+| ------------------------ | ----------------------------------------------------------------- |
+| **Hybrid retrieval**     | VectorIndex wired into cache-miss query path with RRF             |
+| **`resolve_source()`**   | Shared utility extracted from 4 inline copies                     |
+| **Compare CLI routing**  | Routes through `api.compare()` instead of manual `analyze()` x2   |
+| **MCP dimension fix**    | Corrected dimension names to match `SUPPORTED_DIMENSIONS`         |
+| **Dead field removal**   | `CodeChunk.module` removed from models, store, and chunker        |
+| **RepoSource validator** | `model_validator(mode="after")` requires `url` or `local_path`    |
+| **`load_config()`**      | Reads `~/.archex/config.toml` via `tomllib` + `ARCHEX_*` env vars |
+| **Provider model IDs**   | Centralized in `DEFAULT_MODELS` dict in `config.py`               |
+| **Pipeline logging**     | INFO-level logging with timing at all pipeline boundaries         |
 
 ### Phase 6d — Extensibility
 
-| Deliverable | Details |
-| --- | --- |
-| **`ScoringWeights`** | Parameterized scoring (relevance, structural, type_coverage) with sum-to-1 validator |
-| **`PatternRegistry`** | `register()` decorator + `archex.pattern_detectors` entry point discovery |
-| **`AdapterRegistry`** | `register()`, `build_all()` + `archex.language_adapters` entry point discovery |
-| **`Chunker` Protocol** | `runtime_checkable`, accepted as optional `chunker` param in `query()` |
-| **Integration tests** | 12 end-to-end tests covering analyze, query, compare, full pipeline |
+| Deliverable            | Details                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------ |
+| **`ScoringWeights`**   | Parameterized scoring (relevance, structural, type_coverage) with sum-to-1 validator |
+| **`PatternRegistry`**  | `register()` decorator + `archex.pattern_detectors` entry point discovery            |
+| **`AdapterRegistry`**  | `register()`, `build_all()` + `archex.language_adapters` entry point discovery       |
+| **`Chunker` Protocol** | `runtime_checkable`, accepted as optional `chunker` param in `query()`               |
+| **Integration tests**  | 12 end-to-end tests covering analyze, query, compare, full pipeline                  |
 
 ### Phase 6 Acceptance Criteria
 
@@ -775,46 +780,46 @@ Build evaluation datasets and assertions using Attest's graduated assertion pipe
 
 ### Phase 7a — Refactoring
 
-| Deliverable | Details |
-| --- | --- |
-| **Shared `ts_node` module** | Extract duplicate `_text`/`_type`/`_children`/`_field`/`_start_line`/`_end_line` helpers from Python, Go, Rust, TypeScript adapters into `parse/adapters/ts_node.py` |
-| **Dead code removal** | Remove unused `get_adapter()`, `_extract_interfaces()`, redundant `add_node` in `from_edges()`, unused `index_config` param from `api.analyze()` |
-| **Dependency deduplication** | Use sets instead of lists in `_build_module_from_community` for O(1) membership |
-| **Chunker optimization** | Remove unnecessary `sorted()` on already-ordered covered ranges |
-| **Vector zero-copy** | `copy=False` on `numpy.astype` when array is already float32 |
+| Deliverable                  | Details                                                                                                                                                              |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Shared `ts_node` module**  | Extract duplicate `_text`/`_type`/`_children`/`_field`/`_start_line`/`_end_line` helpers from Python, Go, Rust, TypeScript adapters into `parse/adapters/ts_node.py` |
+| **Dead code removal**        | Remove unused `get_adapter()`, `_extract_interfaces()`, redundant `add_node` in `from_edges()`, unused `index_config` param from `api.analyze()`                     |
+| **Dependency deduplication** | Use sets instead of lists in `_build_module_from_community` for O(1) membership                                                                                      |
+| **Chunker optimization**     | Remove unnecessary `sorted()` on already-ordered covered ranges                                                                                                      |
+| **Vector zero-copy**         | `copy=False` on `numpy.astype` when array is already float32                                                                                                         |
 
 ### Phase 7b — Error Handling & Logging
 
-| Deliverable | Details |
-| --- | --- |
-| **LLM failure logging** | `infer_decisions()` logs enrichment failures with `logger.warning()` instead of silently catching |
-| **FTS5 failure logging** | `BM25Index.search()` logs query failures instead of silently returning empty |
-| **Explicit dimension error** | `SentenceTransformerEmbedder.dimension` raises `ArchexIndexError` instead of bare `assert` |
+| Deliverable                  | Details                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------- |
+| **LLM failure logging**      | `infer_decisions()` logs enrichment failures with `logger.warning()` instead of silently catching |
+| **FTS5 failure logging**     | `BM25Index.search()` logs query failures instead of silently returning empty                      |
+| **Explicit dimension error** | `SentenceTransformerEmbedder.dimension` raises `ArchexIndexError` instead of bare `assert`        |
 
 ### Phase 7c — Configuration & Standards
 
-| Deliverable | Details |
-| --- | --- |
-| **`DEFAULT_CACHE_DIR`** | Centralized constant in `config.py`, used by all CLI cache commands |
-| **Config validation** | `model_fields` over `hasattr` for Pydantic v2 correctness |
-| **`validate_dimensions()`** | Extracted from `compare_repos()` for reuse by MCP integration |
-| **Install instructions** | All `pip install` references replaced with `uv add` across CLI, integrations, docstrings |
+| Deliverable                 | Details                                                                                  |
+| --------------------------- | ---------------------------------------------------------------------------------------- |
+| **`DEFAULT_CACHE_DIR`**     | Centralized constant in `config.py`, used by all CLI cache commands                      |
+| **Config validation**       | `model_fields` over `hasattr` for Pydantic v2 correctness                                |
+| **`validate_dimensions()`** | Extracted from `compare_repos()` for reuse by MCP integration                            |
+| **Install instructions**    | All `pip install` references replaced with `uv add` across CLI, integrations, docstrings |
 
 ### Phase 7d — Test Coverage (84% → 90%)
 
-| Test file | Tests added | Target coverage |
-| --- | --- | --- |
-| `tests/test_config.py` (new) | 25 | config.py 41% → 100% |
-| `tests/parse/test_adapter_registry.py` (new) | 5 | adapters/__init__.py 79% → 100% |
-| `tests/serve/test_renderers.py` (new) | 9 | markdown.py 63% → 100%, xml.py 69% → 100% |
-| `tests/serve/test_compare.py` | 13 | compare_cmd.py 42% → 94% |
-| `tests/analyze/test_interfaces.py` | 8 | interfaces.py 85% → 97% |
-| `tests/analyze/test_modules.py` | 10 | modules.py 83% → 100% |
-| `tests/analyze/test_patterns.py` | 7 | patterns.py 89% → 100% |
-| `tests/index/test_chunker.py` | 7 | chunker.py 88% → 90% |
-| `tests/parse/adapters/test_rust.py` | 11 | rust.py 73% → 90% |
-| `tests/parse/test_imports.py` | 4 | edge cases |
-| `tests/acquire/test_discovery.py` | 4 | discovery.py 85% → 100% |
+| Test file                                    | Tests added | Target coverage                           |
+| -------------------------------------------- | ----------- | ----------------------------------------- |
+| `tests/test_config.py` (new)                 | 25          | config.py 41% → 100%                      |
+| `tests/parse/test_adapter_registry.py` (new) | 5           | adapters/**init**.py 79% → 100%           |
+| `tests/serve/test_renderers.py` (new)        | 9           | markdown.py 63% → 100%, xml.py 69% → 100% |
+| `tests/serve/test_compare.py`                | 13          | compare_cmd.py 42% → 94%                  |
+| `tests/analyze/test_interfaces.py`           | 8           | interfaces.py 85% → 97%                   |
+| `tests/analyze/test_modules.py`              | 10          | modules.py 83% → 100%                     |
+| `tests/analyze/test_patterns.py`             | 7           | patterns.py 89% → 100%                    |
+| `tests/index/test_chunker.py`                | 7           | chunker.py 88% → 90%                      |
+| `tests/parse/adapters/test_rust.py`          | 11          | rust.py 73% → 90%                         |
+| `tests/parse/test_imports.py`                | 4           | edge cases                                |
+| `tests/acquire/test_discovery.py`            | 4           | discovery.py 85% → 100%                   |
 
 ### Phase 7 Acceptance Criteria
 
@@ -831,44 +836,107 @@ Build evaluation datasets and assertions using Attest's graduated assertion pipe
 
 ### v0.1.0 Release (End of Phase 4)
 
-| Metric           | Target                                    | Actual                                   |
-| ---------------- | ----------------------------------------- | ---------------------------------------- |
-| PyPI installable | ✅ `uv add archex` works                 | ✅                                       |
-| Language support | 4 adapters (Python, TypeScript, Go, Rust) | ✅ 4 adapters                            |
-| Test coverage    | > 75%                                     | ✅ 81%                                   |
-| CLI commands     | `analyze`, `query`, `compare`, `cache`    | ✅                                       |
-| Performance      | < 30s full pipeline for 500-file repo     | ✅                                       |
-| Dependencies     | < 30MB core install                       | ✅                                       |
+| Metric           | Target                                    | Actual        |
+| ---------------- | ----------------------------------------- | ------------- |
+| PyPI installable | ✅ `uv add archex` works                  | ✅            |
+| Language support | 4 adapters (Python, TypeScript, Go, Rust) | ✅ 4 adapters |
+| Test coverage    | > 75%                                     | ✅ 81%        |
+| CLI commands     | `analyze`, `query`, `compare`, `cache`    | ✅            |
+| Performance      | < 30s full pipeline for 500-file repo     | ✅            |
+| Dependencies     | < 30MB core install                       | ✅            |
 
 ### v0.2.0 (End of Phase 5)
 
-| Metric                 | Target                  | Actual                                   |
-| ---------------------- | ----------------------- | ---------------------------------------- |
-| Framework integrations | MCP + LangChain + CAIRN | ✅ MCP + LangChain + LlamaIndex         |
-| Eval coverage          | 10+ Attest test cases   | Deferred                                 |
-| Content published      | 3+ pieces               | Deferred                                 |
-| Test suite             | Growing                 | ✅ 422 tests, 81% coverage              |
+| Metric                 | Target                  | Actual                          |
+| ---------------------- | ----------------------- | ------------------------------- |
+| Framework integrations | MCP + LangChain + CAIRN | ✅ MCP + LangChain + LlamaIndex |
+| Eval coverage          | 10+ Attest test cases   | Deferred                        |
+| Content published      | 3+ pieces               | Deferred                        |
+| Test suite             | Growing                 | ✅ 422 tests, 81% coverage      |
 
 ### v0.3.0 (End of Phase 6)
 
-| Metric                 | Target                  | Actual                                   |
-| ---------------------- | ----------------------- | ---------------------------------------- |
-| Security hardening     | All audit findings      | ✅ 14 items addressed                   |
-| Performance            | Cache-first query       | ✅ Full parse skipped on cache hit       |
-| Extensibility          | Plugin entry points     | ✅ 2 entry point groups + protocols      |
-| Test suite             | > 500 tests, > 80%     | ✅ 538 tests, 84% coverage              |
-| Type safety            | 0 pyright errors        | ✅                                       |
+| Metric             | Target              | Actual                              |
+| ------------------ | ------------------- | ----------------------------------- |
+| Security hardening | All audit findings  | ✅ 14 items addressed               |
+| Performance        | Cache-first query   | ✅ Full parse skipped on cache hit  |
+| Extensibility      | Plugin entry points | ✅ 2 entry point groups + protocols |
+| Test suite         | > 500 tests, > 80%  | ✅ 538 tests, 84% coverage          |
+| Type safety        | 0 pyright errors    | ✅                                  |
 
 ### v0.4.0 (End of Phase 7)
 
-| Metric                 | Target                  | Actual                                   |
-| ---------------------- | ----------------------- | ---------------------------------------- |
-| Code deduplication     | Shared adapter helpers  | ✅ ts_node module, ~140 lines removed   |
-| Dead code removal      | No unused functions     | ✅ 4 unused functions/params removed    |
-| Error observability    | No silent catches       | ✅ 3 silent handlers replaced with logs |
-| Test suite             | > 600 tests, 90%       | ✅ 641 tests, 90% coverage              |
-| Type safety            | 0 pyright errors        | ✅                                       |
-| Lint clean             | ruff check + format     | ✅                                       |
+| Metric              | Target                 | Actual                                  |
+| ------------------- | ---------------------- | --------------------------------------- |
+| Code deduplication  | Shared adapter helpers | ✅ ts_node module, ~140 lines removed   |
+| Dead code removal   | No unused functions    | ✅ 4 unused functions/params removed    |
+| Error observability | No silent catches      | ✅ 3 silent handlers replaced with logs |
+| Test suite          | > 600 tests, 90%       | ✅ 641 tests, 90% coverage              |
+| Type safety         | 0 pyright errors       | ✅                                      |
+| Lint clean          | ruff check + format    | ✅                                      |
+
+### v0.5.0 (Enhancements)
+
+| Metric             | Target                  | Actual                             |
+| ------------------ | ----------------------- | ---------------------------------- |
+| Delta indexing     | 3-path cache + surgical | ✅ git diff + mtime fallback       |
+| Language adapters  | 8 total                 | ✅ +Java, Kotlin, C#, Swift        |
+| Shared JVM helpers | DRY across Java/Kotlin  | ✅ \_jvm_helpers.py                |
+| Engine fallback    | language-pack support   | ✅ \_try_language_pack() for Swift |
+| Test suite         | > 1000 tests, > 90%     | ✅ 1274 tests, 92% coverage        |
+| Type safety        | 0 pyright errors        | ✅                                 |
+| Lint clean         | ruff check + format     | ✅                                 |
+
+---
+
+## Enhancement Releases
+
+### Enhancement 5 — Delta Indexing
+
+**Goal:** Avoid full re-indexing when only a few files changed. Use git diff between cached commit and HEAD to surgically update the index.
+
+**Deliverables:**
+
+- 3-path cache decision in `_ensure_index`: exact hit → delta → full re-index
+- `compute_delta()`: git diff `--name-status -M` between commits, returns `DeltaManifest`
+- `apply_delta()`: renames → deletions → re-parse → atomic store update → graph update → BM25 rebuild → metadata
+- `compute_mtime_delta()`: mtime-based fallback for non-git repos
+- New models: `ChangeStatus`, `FileChange`, `DeltaManifest`, `DeltaMeta`
+- New exception: `DeltaIndexError`
+- Store methods: `delete_chunks_for_files`, `delete_edges_for_files`, `update_file_paths`, `delete_and_insert_for_files`
+- `delta_threshold` config (default 0.5): >50% files changed triggers full re-index
+
+**Acceptance Criteria:**
+
+- [x] Exact cache hit skips all work
+- [x] Delta path re-parses only changed files
+- [x] Renames update file paths in store without re-parsing
+- [x] Mtime fallback works for non-git repos
+- [x] Threshold triggers full re-index when too many files changed
+- [x] All tests pass, 0 pyright errors
+
+### Enhancement 7 — Expanded Language Support
+
+**Goal:** Add Java, Kotlin, C#, and Swift adapters with full symbol/import/entry-point support.
+
+**Deliverables:**
+
+- Java adapter with package-private default visibility, interface member PUBLIC default
+- Kotlin adapter with PUBLIC default, extension functions, companion objects, data/sealed classes
+- C# adapter with namespace-qualified names, 6→3 visibility mapping, properties/events/delegates
+- Swift adapter with INTERNAL default, extensions, actors, protocols, entry point detection
+- Shared `_jvm_helpers.py` for Java/Kotlin common logic
+- Engine `_try_language_pack()` fallback for Swift grammar
+- 227 new adapter tests
+
+**Acceptance Criteria:**
+
+- [x] All 4 adapters extract symbols, parse imports, detect entry points
+- [x] Visibility mapping correct per language convention
+- [x] JVM helpers shared between Java and Kotlin (no duplication)
+- [x] Swift works via language-pack fallback
+- [x] Integration tests pass with new adapters registered
+- [x] 1274 tests, 92% coverage, 0 pyright errors
 
 ---
 
