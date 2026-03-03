@@ -17,6 +17,10 @@ _LANGUAGE_LOADERS: dict[str, tuple[str, str]] = {
     "tsx": ("tree_sitter_typescript", "language_tsx"),
     "go": ("tree_sitter_go", "language"),
     "rust": ("tree_sitter_rust", "language"),
+    "java": ("tree_sitter_java", "language"),
+    "kotlin": ("tree_sitter_kotlin", "language"),
+    "csharp": ("tree_sitter_c_sharp", "language"),
+    "swift": ("tree_sitter_swift", "language"),
 }
 
 
@@ -41,10 +45,8 @@ class TreeSitterEngine:
         module_name, func_name = _LANGUAGE_LOADERS[language_id]
         try:
             module = importlib.import_module(module_name)
-        except ImportError as exc:
-            raise ParseError(
-                f"tree-sitter grammar for {language_id!r} not installed: {exc}"
-            ) from exc
+        except ImportError:
+            return self._try_language_pack(language_id)
 
         try:
             func = getattr(module, func_name)
@@ -52,6 +54,28 @@ class TreeSitterEngine:
         except Exception as exc:
             raise ParseError(f"Failed to load tree-sitter language {language_id!r}: {exc}") from exc
 
+        self._languages[language_id] = lang
+        return lang
+
+    def _try_language_pack(self, language_id: str) -> Language:
+        """Fallback: load grammar from tree-sitter-language-pack if standalone unavailable."""
+        try:
+            from tree_sitter_language_pack import (
+                get_language as _pack_get_language,  # type: ignore[import-untyped]
+            )
+
+            raw = _pack_get_language(language_id)  # pyright: ignore[reportUnknownVariableType,reportArgumentType]
+            # tree-sitter-language-pack >=0.7 returns Language directly; older returns capsule
+            lang = raw if isinstance(raw, Language) else Language(raw)  # pyright: ignore[reportDeprecated,reportUnknownArgumentType,reportUnnecessaryIsInstance]
+        except ImportError as exc:
+            raise ParseError(
+                f"tree-sitter grammar for {language_id!r} not installed "
+                f"(tried standalone package and tree-sitter-language-pack): {exc}"
+            ) from exc
+        except Exception as exc:
+            raise ParseError(
+                f"Failed to load tree-sitter language {language_id!r} from language-pack: {exc}"
+            ) from exc
         self._languages[language_id] = lang
         return lang
 

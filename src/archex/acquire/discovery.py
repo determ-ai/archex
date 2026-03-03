@@ -16,6 +16,11 @@ EXTENSION_MAP: dict[str, str] = {
     ".jsx": "javascript",
     ".go": "go",
     ".rs": "rust",
+    ".java": "java",
+    ".kt": "kotlin",
+    ".kts": "kotlin",
+    ".cs": "csharp",
+    ".swift": "swift",
 }
 
 DEFAULT_IGNORES: list[str] = [
@@ -32,6 +37,10 @@ DEFAULT_IGNORES: list[str] = [
     "build/",
     ".eggs/",
     "*.egg-info/",
+    "target/",
+    "bin/",
+    "obj/",
+    ".build/",
 ]
 
 

@@ -103,6 +103,11 @@ def test_missing_grammar_module_raises_parse_error() -> None:
     engine._languages.clear()  # pyright: ignore[reportPrivateUsage]
     engine._parsers.clear()  # pyright: ignore[reportPrivateUsage]
     with (
+        patch.object(
+            TreeSitterEngine,
+            "_try_language_pack",
+            side_effect=ParseError("not installed"),
+        ),
         patch("importlib.import_module", side_effect=ImportError("no module")),
         pytest.raises(ParseError, match="not installed"),
     ):
