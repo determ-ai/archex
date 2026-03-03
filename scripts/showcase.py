@@ -648,7 +648,9 @@ def run_insights(r: ShowcaseResults) -> None:
         # Interface density
         if stats.symbol_count > 0:
             iface_ratio = interface_count / stats.symbol_count * 100
-            indent(f"Interfaces:     {interface_count} ({iface_ratio:.0f}% of symbols are public API)")
+            indent(
+                f"Interfaces:     {interface_count} ({iface_ratio:.0f}% of symbols are public API)"
+            )
         print()
 
     # --- Token Budget ---
@@ -679,7 +681,12 @@ def run_insights(r: ShowcaseResults) -> None:
             smallest = min(r.xml_chars, r.json_chars, r.markdown_chars)
             largest = max(r.xml_chars, r.json_chars, r.markdown_chars)
             overhead = (largest - smallest) / smallest * 100
-            best = "XML" if smallest == r.xml_chars else ("Markdown" if smallest == r.markdown_chars else "JSON")
+            if smallest == r.xml_chars:
+                best = "XML"
+            elif smallest == r.markdown_chars:
+                best = "Markdown"
+            else:
+                best = "JSON"
             indent(f"Most compact:   {best} ({smallest:,} chars)")
             indent(f"Format spread:  {overhead:.0f}% overhead (largest vs smallest)")
         print()
@@ -705,7 +712,9 @@ def run_insights(r: ShowcaseResults) -> None:
         score_spread = cold.chunks[0].final_score - cold.chunks[-1].final_score
         indent(f"Chunk count:    {len(cold.chunks)}")
         indent(f"Unique files:   {unique_files}")
-        indent(f"Score spread:   {cold.chunks[0].final_score:.3f} → {cold.chunks[-1].final_score:.3f} (Δ{score_spread:.3f})")
+        first = cold.chunks[0].final_score
+        last = cold.chunks[-1].final_score
+        indent(f"Score spread:   {first:.3f} → {last:.3f} (Δ{score_spread:.3f})")
 
     # Symbol search effectiveness
     if r.search_matches:
