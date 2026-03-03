@@ -179,10 +179,11 @@ def test_resolve_nested_module(
 
 
 def test_parse_imports_worker_raises_on_missing_file() -> None:
-    """_parse_imports_worker propagates exceptions for a missing file."""
+    """_parse_imports_worker propagates ParseError for a missing file."""
+    from archex.exceptions import ParseError
     from archex.parse.imports import _parse_imports_worker  # pyright: ignore[reportPrivateUsage]
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(ParseError):
         _parse_imports_worker("/nonexistent/ghost.py", "ghost.py", "python")
 
 

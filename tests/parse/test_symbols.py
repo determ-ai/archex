@@ -171,10 +171,11 @@ def test_parse_file_worker_success(tmp_path: Path) -> None:
 
 
 def test_parse_file_worker_raises_on_missing_file() -> None:
-    """_parse_file_worker propagates FileNotFoundError for a missing file."""
+    """_parse_file_worker propagates ParseError for a missing file."""
+    from archex.exceptions import ParseError
     from archex.parse.symbols import _parse_file_worker  # pyright: ignore[reportPrivateUsage]
 
-    with pytest.raises(FileNotFoundError):
+    with pytest.raises(ParseError):
         _parse_file_worker("/nonexistent/ghost.py", "ghost.py", "python")
 
 
