@@ -16,13 +16,16 @@ def format_markdown(report: BenchmarkReport) -> str:
     lines.append(f"**Question:** {report.question}")
     lines.append(f"**Baseline tokens:** {report.baseline_tokens:,}")
     lines.append("")
-    lines.append("| Strategy | Tokens | Savings | Recall | Precision | Files | Time (ms) |")
-    lines.append("|----------|--------|---------|--------|-----------|-------|-----------|")
+    header = "| Strategy | Tokens | Savings | Recall | Precision | F1 | MRR | Files | Time (ms) |"
+    lines.append(header)
+    lines.append(
+        "|----------|--------|---------|--------|-----------|------|------|-------|-----------|"
+    )  # noqa: E501
     for r in report.results:
         lines.append(
             f"| {r.strategy.value} | {r.tokens_total:,} | {r.savings_vs_raw:.1f}% "
-            f"| {r.recall:.2f} | {r.precision:.2f} | {r.files_accessed} "
-            f"| {r.wall_time_ms:.0f} |"
+            f"| {r.recall:.2f} | {r.precision:.2f} | {r.f1_score:.2f} | {r.mrr:.2f} "
+            f"| {r.files_accessed} | {r.wall_time_ms:.0f} |"
         )
     lines.append("")
     return "\n".join(lines)
@@ -47,6 +50,8 @@ def format_summary(reports: list[BenchmarkReport]) -> str:
     strategy_totals: dict[str, list[float]] = {}
     strategy_recalls: dict[str, list[float]] = {}
     strategy_savings: dict[str, list[float]] = {}
+    strategy_f1s: dict[str, list[float]] = {}
+    strategy_mrrs: dict[str, list[float]] = {}
 
     for report in reports:
         for r in report.results:
@@ -54,20 +59,27 @@ def format_summary(reports: list[BenchmarkReport]) -> str:
             strategy_totals.setdefault(name, []).append(float(r.tokens_total))
             strategy_recalls.setdefault(name, []).append(r.recall)
             strategy_savings.setdefault(name, []).append(r.savings_vs_raw)
+            strategy_f1s.setdefault(name, []).append(r.f1_score)
+            strategy_mrrs.setdefault(name, []).append(r.mrr)
 
-    lines.append("| Strategy | Avg Tokens | Avg Savings | Avg Recall | Tasks |")
-    lines.append("|----------|------------|-------------|------------|-------|")
+    lines.append("| Strategy | Avg Tokens | Avg Savings | Avg Recall | Avg F1 | Avg MRR | Tasks |")
+    lines.append("|----------|------------|-------------|------------|--------|---------|-------|")
 
     for name in sorted(strategy_totals.keys()):
         tokens_list = strategy_totals[name]
         recalls_list = strategy_recalls[name]
         savings_list = strategy_savings[name]
+        f1s_list = strategy_f1s[name]
+        mrrs_list = strategy_mrrs[name]
         count = len(tokens_list)
         avg_tokens = sum(tokens_list) / count
         avg_recall = sum(recalls_list) / count
         avg_savings = sum(savings_list) / count
+        avg_f1 = sum(f1s_list) / count
+        avg_mrr = sum(mrrs_list) / count
         lines.append(
-            f"| {name} | {avg_tokens:,.0f} | {avg_savings:.1f}% | {avg_recall:.2f} | {count} |"
+            f"| {name} | {avg_tokens:,.0f} | {avg_savings:.1f}% "
+            f"| {avg_recall:.2f} | {avg_f1:.2f} | {avg_mrr:.2f} | {count} |"
         )
 
     lines.append("")

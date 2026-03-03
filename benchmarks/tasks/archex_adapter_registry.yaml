@@ -1,0 +1,18 @@
+task_id: archex_adapter_registry
+repo: "."
+commit: "HEAD"
+question: "How does archex register language adapters?"
+expected_files:
+  - src/archex/parse/adapters/__init__.py
+  - src/archex/parse/adapters/python.py
+  - src/archex/parse/adapters/base.py
+expected_symbols:
+  - AdapterRegistry
+  - PythonAdapter
+  - LanguageAdapter
+token_budget: 8192
+keywords:
+  - adapter
+  - registry
+  - language
+  - parser

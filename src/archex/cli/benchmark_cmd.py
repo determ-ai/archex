@@ -7,6 +7,8 @@ from pathlib import Path
 
 import click
 
+from archex.benchmark.baseline import compare_baseline, load_baseline, save_baseline
+from archex.benchmark.gate import QualityThresholds, check_gate
 from archex.benchmark.loader import load_tasks
 from archex.benchmark.models import BenchmarkReport, Strategy
 from archex.benchmark.reporter import format_json, format_markdown, format_summary
@@ -133,3 +135,132 @@ def validate_cmd(tasks_dir: str) -> None:
     if has_errors:
         raise SystemExit(1)
     click.echo(f"\nAll {len(tasks)} task(s) valid.")
+
+
+@benchmark_cmd.group("baseline")
+def baseline_cmd() -> None:
+    """Manage benchmark baselines for regression detection."""
+
+
+@baseline_cmd.command("save")
+@click.option(
+    "--input",
+    "input_dir",
+    default="benchmarks/results",
+    type=click.Path(exists=True),
+    help="Directory containing result JSON files.",
+)
+@click.option(
+    "--output",
+    "output_path",
+    default="benchmarks/baseline.json",
+    type=click.Path(),
+    help="Output path for baseline JSON.",
+)
+def baseline_save_cmd(input_dir: str, output_path: str) -> None:
+    """Save current benchmark results as a golden baseline."""
+    input_path = Path(input_dir)
+    reports: list[BenchmarkReport] = []
+    for json_file in sorted(input_path.glob("*.json")):
+        data = json.loads(json_file.read_text(encoding="utf-8"))
+        reports.append(BenchmarkReport.model_validate(data))
+
+    if not reports:
+        raise click.ClickException(f"No result files found in {input_dir}")
+
+    baseline = save_baseline(reports)
+    out = Path(output_path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(baseline.model_dump_json(indent=2), encoding="utf-8")
+    click.echo(f"Saved baseline with {len(baseline.entries)} entries to {output_path}")
+
+
+@baseline_cmd.command("compare")
+@click.option(
+    "--input",
+    "input_dir",
+    default="benchmarks/results",
+    type=click.Path(exists=True),
+    help="Directory containing result JSON files.",
+)
+@click.option(
+    "--baseline",
+    "baseline_path",
+    required=True,
+    type=click.Path(exists=True),
+    help="Path to baseline JSON file.",
+)
+def baseline_compare_cmd(input_dir: str, baseline_path: str) -> None:
+    """Compare current results against a saved baseline."""
+    input_path = Path(input_dir)
+    reports: list[BenchmarkReport] = []
+    for json_file in sorted(input_path.glob("*.json")):
+        data = json.loads(json_file.read_text(encoding="utf-8"))
+        reports.append(BenchmarkReport.model_validate(data))
+
+    if not reports:
+        raise click.ClickException(f"No result files found in {input_dir}")
+
+    baseline_data = json.loads(Path(baseline_path).read_text(encoding="utf-8"))
+    baseline = load_baseline(baseline_data)
+
+    comparisons = compare_baseline(reports, baseline)
+    regressions = [c for c in comparisons if c.regression]
+
+    click.echo(f"Compared {len(comparisons)} metric(s) against baseline.")
+    if regressions:
+        click.echo(f"\nREGRESSIONS DETECTED: {len(regressions)}")
+        for r in regressions:
+            click.echo(
+                f"  {r.task_id}/{r.strategy} {r.metric}: "
+                f"{r.baseline_value:.3f} -> {r.current_value:.3f} (delta: {r.delta:+.3f})"
+            )
+        raise SystemExit(1)
+    else:
+        click.echo("No regressions detected.")
+
+
+@benchmark_cmd.command("gate")
+@click.option(
+    "--input",
+    "input_dir",
+    default="benchmarks/results",
+    type=click.Path(exists=True),
+    help="Directory containing result JSON files.",
+)
+@click.option("--min-recall", default=0.6, type=float, help="Minimum recall threshold.")
+@click.option("--min-precision", default=0.3, type=float, help="Minimum precision threshold.")
+@click.option("--min-f1", default=0.4, type=float, help="Minimum F1 threshold.")
+@click.option("--min-mrr", default=0.3, type=float, help="Minimum MRR threshold.")
+def gate_cmd(
+    input_dir: str,
+    min_recall: float,
+    min_precision: float,
+    min_f1: float,
+    min_mrr: float,
+) -> None:
+    """Check benchmark results against quality thresholds."""
+    input_path = Path(input_dir)
+    reports: list[BenchmarkReport] = []
+    for json_file in sorted(input_path.glob("*.json")):
+        data = json.loads(json_file.read_text(encoding="utf-8"))
+        reports.append(BenchmarkReport.model_validate(data))
+
+    if not reports:
+        raise click.ClickException(f"No result files found in {input_dir}")
+
+    thresholds = QualityThresholds(
+        min_recall=min_recall,
+        min_precision=min_precision,
+        min_f1=min_f1,
+        min_mrr=min_mrr,
+    )
+    violations = check_gate(reports, thresholds)
+
+    if violations:
+        click.echo(f"QUALITY GATE FAILED: {len(violations)} violation(s)")
+        for v in violations:
+            click.echo(f"  {v.task_id}/{v.strategy} {v.metric}: {v.actual:.3f} < {v.threshold:.3f}")
+        raise SystemExit(1)
+    else:
+        click.echo("Quality gate passed.")

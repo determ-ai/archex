@@ -36,6 +36,8 @@ class BenchmarkResult(BaseModel):
     files_accessed: int
     recall: float
     precision: float
+    f1_score: float = 0.0
+    mrr: float = 0.0
     symbol_recall: float = 0.0
     savings_vs_raw: float
     wall_time_ms: float

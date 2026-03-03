@@ -1,0 +1,16 @@
+task_id: archex_pattern_detection
+repo: "."
+commit: "HEAD"
+question: "How does archex detect architectural patterns?"
+expected_files:
+  - src/archex/analyze/patterns.py
+  - src/archex/models.py
+expected_symbols:
+  - detect_patterns
+  - PatternRegistry
+  - PatternMatch
+token_budget: 8192
+keywords:
+  - pattern
+  - detect
+  - registry

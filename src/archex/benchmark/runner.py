@@ -53,7 +53,10 @@ def run_benchmark(
 
     needs_cleanup = False
     if repo_path is None:
-        repo_path, needs_cleanup = clone_at_commit(task.repo, task.commit)
+        if task.repo == ".":
+            repo_path = Path.cwd()
+        else:
+            repo_path, needs_cleanup = clone_at_commit(task.repo, task.commit)
 
     try:
         results: list[BenchmarkResult] = []
@@ -118,7 +121,10 @@ def run_all(
 
     for task in tasks:
         print(f"Running benchmark: {task.task_id} ({task.repo})", file=sys.stderr)
-        report = run_benchmark(task, strategies=strategies)
+        task_repo_path: Path | None = None
+        if task.repo == ".":
+            task_repo_path = Path.cwd()
+        report = run_benchmark(task, strategies=strategies, repo_path=task_repo_path)
         reports.append(report)
 
         result_path = output_dir / f"{task.task_id}.json"

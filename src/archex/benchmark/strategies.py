@@ -124,6 +124,22 @@ _STOPWORDS = frozenset(
 )
 
 
+def compute_f1(recall: float, precision: float) -> float:
+    """Harmonic mean of recall and precision."""
+    if recall + precision == 0.0:
+        return 0.0
+    return 2 * (recall * precision) / (recall + precision)
+
+
+def compute_mrr(ranked_files: list[str], expected_files: list[str]) -> float:
+    """Mean reciprocal rank: reciprocal of the rank of the first expected file found."""
+    expected_set = set(expected_files)
+    for i, f in enumerate(ranked_files, 1):
+        if f in expected_set:
+            return 1.0 / i
+    return 0.0
+
+
 def compute_recall(result_files: set[str], expected_files: list[str]) -> float:
     """Fraction of expected files found in results."""
     if not expected_files:
@@ -224,6 +240,7 @@ def run_raw_grepped(task: BenchmarkTask, repo_path: Path) -> BenchmarkResult:
     wall_ms = (time.perf_counter() - t0) * 1000
     recall = compute_recall(matched_files, task.expected_files)
     precision = compute_precision(matched_files, task.expected_files)
+    f1 = compute_f1(recall, precision)
 
     return BenchmarkResult(
         task_id=task.task_id,
@@ -233,6 +250,7 @@ def run_raw_grepped(task: BenchmarkTask, repo_path: Path) -> BenchmarkResult:
         files_accessed=len(matched_files),
         recall=recall,
         precision=precision,
+        f1_score=f1,
         savings_vs_raw=0.0,  # backfilled by runner
         wall_time_ms=wall_ms,
         cached=False,
@@ -261,9 +279,12 @@ def run_archex_query(task: BenchmarkTask, repo_path: Path) -> BenchmarkResult:
     )
 
     result_files = {c.chunk.file_path for c in bundle.chunks}
+    ranked_files = [c.chunk.file_path for c in bundle.chunks]
     wall_ms = (time.perf_counter() - t0) * 1000
     recall = compute_recall(result_files, task.expected_files)
     precision = compute_precision(result_files, task.expected_files)
+    f1 = compute_f1(recall, precision)
+    mrr_val = compute_mrr(ranked_files, task.expected_files)
 
     return BenchmarkResult(
         task_id=task.task_id,
@@ -273,6 +294,8 @@ def run_archex_query(task: BenchmarkTask, repo_path: Path) -> BenchmarkResult:
         files_accessed=len(result_files),
         recall=recall,
         precision=precision,
+        f1_score=f1,
+        mrr=mrr_val,
         savings_vs_raw=0.0,  # backfilled by runner
         wall_time_ms=wall_ms,
         cached=timing.cached,
@@ -311,6 +334,8 @@ def run_archex_query_hybrid(task: BenchmarkTask, repo_path: Path) -> BenchmarkRe
             files_accessed=0,
             recall=0.0,
             precision=0.0,
+            f1_score=0.0,
+            mrr=0.0,
             savings_vs_raw=0.0,
             wall_time_ms=wall_ms,
             cached=False,
@@ -319,9 +344,12 @@ def run_archex_query_hybrid(task: BenchmarkTask, repo_path: Path) -> BenchmarkRe
         )
 
     result_files = {c.chunk.file_path for c in bundle.chunks}
+    ranked_files = [c.chunk.file_path for c in bundle.chunks]
     wall_ms = (time.perf_counter() - t0) * 1000
     recall = compute_recall(result_files, task.expected_files)
     precision = compute_precision(result_files, task.expected_files)
+    f1 = compute_f1(recall, precision)
+    mrr_val = compute_mrr(ranked_files, task.expected_files)
 
     return BenchmarkResult(
         task_id=task.task_id,
@@ -331,6 +359,8 @@ def run_archex_query_hybrid(task: BenchmarkTask, repo_path: Path) -> BenchmarkRe
         files_accessed=len(result_files),
         recall=recall,
         precision=precision,
+        f1_score=f1,
+        mrr=mrr_val,
         savings_vs_raw=0.0,  # backfilled by runner
         wall_time_ms=wall_ms,
         cached=timing.cached,
