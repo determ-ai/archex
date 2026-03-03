@@ -193,10 +193,10 @@ class TestUpdateFiles:
         ]
         graph = DependencyGraph.from_parsed_files(parsed, {})
         _ = graph.structural_centrality()  # populate cache
-        assert graph._centrality_cache is not None
+        assert graph._centrality_cache is not None  # pyright: ignore[reportPrivateUsage]
 
         graph.update_files({"a.py"}, [])
-        assert graph._centrality_cache is None
+        assert graph._centrality_cache is None  # pyright: ignore[reportPrivateUsage]
 
     def test_empty_inputs(self) -> None:
         parsed = [ParsedFile(path="a.py", language="python")]
@@ -213,9 +213,9 @@ class TestUpdateFiles:
         graph = DependencyGraph.from_parsed_files(parsed, {})
         graph.update_files({"b.py"}, [])
         assert graph.file_count == 2
-        assert "a.py" in graph._file_graph.nodes()
-        assert "c.py" in graph._file_graph.nodes()
-        assert "b.py" not in graph._file_graph.nodes()
+        assert "a.py" in graph._file_graph.nodes()  # pyright: ignore[reportPrivateUsage]
+        assert "c.py" in graph._file_graph.nodes()  # pyright: ignore[reportPrivateUsage]
+        assert "b.py" not in graph._file_graph.nodes()  # pyright: ignore[reportPrivateUsage]
 
     def test_remove_nonexistent_path_is_safe(self) -> None:
         parsed = [ParsedFile(path="a.py", language="python")]

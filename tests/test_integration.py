@@ -727,9 +727,6 @@ def _git(repo: Path, *args: str) -> str:
     return result.stdout.strip()
 
 
-def _git_head(repo: Path) -> str:
-    return _git(repo, "rev-parse", "HEAD")
-
 
 class TestDeltaIndexIntegration:
     """End-to-end delta indexing via _ensure_index / query()."""
