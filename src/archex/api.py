@@ -29,6 +29,7 @@ from archex.models import (
     FileTree,
     FileTreeEntry,
     IndexConfig,
+    PipelineTiming,
     RepoMetadata,
     RepoSource,
     ScoringWeights,
@@ -64,6 +65,7 @@ if TYPE_CHECKING:
 def _ensure_index(
     source: RepoSource,
     config: Config | None = None,
+    timing: PipelineTiming | None = None,
 ) -> IndexStore:
     """Ensure the repo is indexed and return an open IndexStore.
 
@@ -74,6 +76,7 @@ def _ensure_index(
     if config is None:
         config = Config()
 
+    t_start = time.perf_counter()
     cache = CacheManager(cache_dir=config.cache_dir)
     cache_key = cache.cache_key(source)
 
@@ -81,12 +84,19 @@ def _ensure_index(
     if cached_db is not None:
         store = IndexStore(cached_db)
         if not store.needs_reindex():
+            if timing is not None:
+                timing.cached = True
+                timing.index_ms = _elapsed_ms(t_start)
             return store
         store.close()
         cache.invalidate(cache_key)
 
+    t_acq = time.perf_counter()
     repo_path, _url, _local_path, cleanup = _acquire(source)
+    if timing is not None:
+        timing.acquire_ms = _elapsed_ms(t_acq)
     try:
+        t_parse = time.perf_counter()
         files = discover_files(
             repo_path, languages=config.languages, max_file_size=config.max_file_size
         )
@@ -109,7 +119,10 @@ def _ensure_index(
             except OSError:
                 continue
         all_chunks = file_chunker.chunk_files(parsed_files, sources)
+        if timing is not None:
+            timing.parse_ms = _elapsed_ms(t_parse)
 
+        t_idx = time.perf_counter()
         db_path = Path(tempfile.mkdtemp()) / "index.db"
         store = IndexStore(db_path)
         store.insert_chunks(all_chunks)
@@ -119,6 +132,8 @@ def _ensure_index(
         if config.cache:
             store.conn.execute("PRAGMA wal_checkpoint(FULL)")
             cache.put(cache_key, db_path)
+        if timing is not None:
+            timing.index_ms = _elapsed_ms(t_idx)
 
         return store
     finally:
@@ -206,6 +221,7 @@ def _build_adapters() -> dict[str, LanguageAdapter]:
 def analyze(
     source: RepoSource,
     config: Config | None = None,
+    timing: PipelineTiming | None = None,
 ) -> ArchProfile:
     """Acquire, parse, index, and analyze a repository.
 
@@ -217,7 +233,10 @@ def analyze(
 
     t0 = time.perf_counter()
     repo_path, url, local_path, cleanup = _acquire(source)
-    logger.info("Acquired repo %s in %.0fms", url or local_path, _elapsed_ms(t0))
+    acquire_ms = _elapsed_ms(t0)
+    logger.info("Acquired repo %s in %.0fms", url or local_path, acquire_ms)
+    if timing is not None:
+        timing.acquire_ms = acquire_ms
     try:
         t1 = time.perf_counter()
         files = discover_files(
@@ -234,7 +253,10 @@ def analyze(
         file_map = build_file_map(files)
         file_languages = {f.path: f.language for f in files}
         resolved_map = resolve_imports(import_map, file_map, adapters, file_languages)
+        parse_ms = _elapsed_ms(t1)  # discover + parse combined
         logger.info("Parsed %d files in %.0fms", len(parsed_files), _elapsed_ms(t2))
+        if timing is not None:
+            timing.parse_ms = parse_ms
 
         graph = DependencyGraph.from_parsed_files(parsed_files, resolved_map)
 
@@ -242,13 +264,16 @@ def analyze(
         modules = detect_modules(graph, parsed_files)
         patterns = detect_patterns(parsed_files, graph)
         interfaces = extract_interfaces(parsed_files, graph)
+        analysis_ms = _elapsed_ms(t3)
         logger.info(
             "Analysis: %d modules, %d patterns, %d interfaces in %.0fms",
             len(modules),
             len(patterns),
             len(interfaces),
-            _elapsed_ms(t3),
+            analysis_ms,
         )
+        if timing is not None:
+            timing.index_ms = analysis_ms
 
         provider = None
         if config.enrich and config.provider:
@@ -280,6 +305,8 @@ def analyze(
             decisions=decisions,
         )
         logger.info("analyze() completed in %.0fms", _elapsed_ms(t0))
+        if timing is not None:
+            timing.total_ms = _elapsed_ms(t0)
         return profile
     finally:
         cleanup()
@@ -293,6 +320,7 @@ def query(
     index_config: IndexConfig | None = None,
     scoring_weights: ScoringWeights | None = None,
     chunker: Chunker | None = None,
+    timing: PipelineTiming | None = None,
 ) -> ContextBundle:
     """Retrieve a ranked ContextBundle for a natural-language query.
 
@@ -320,6 +348,8 @@ def query(
             cached_db = None
         else:
             try:
+                if timing is not None:
+                    timing.cached = True
                 bm25 = BM25Index(store)
                 cached_chunks = store.get_chunks()
                 if cached_chunks:
@@ -339,7 +369,10 @@ def query(
                         if embedder is not None:
                             vector_results = vec_idx.search(question, embedder, top_k=50)  # type: ignore[assignment]
 
+                t_search = time.perf_counter()
                 search_results = bm25.search(question, top_k=50)
+                if timing is not None:
+                    timing.search_ms = _elapsed_ms(t_search)
                 bundle = assemble_context(
                     search_results=search_results,
                     graph=graph,
@@ -349,7 +382,12 @@ def query(
                     vector_results=vector_results,  # type: ignore[arg-type]
                     scoring_weights=scoring_weights,
                 )
+                if timing is not None:
+                    timing.assemble_ms = bundle.retrieval_metadata.assembly_time_ms
+                bundle.retrieval_metadata.retrieval_time_ms = _elapsed_ms(t0)
                 logger.info("query() [cached] completed in %.0fms", _elapsed_ms(t0))
+                if timing is not None:
+                    timing.total_ms = _elapsed_ms(t0)
                 return bundle
             finally:
                 store.close()
@@ -358,7 +396,10 @@ def query(
     logger.info("Cache miss — running full pipeline")
     t1 = time.perf_counter()
     repo_path, _url, _local_path, cleanup = _acquire(source)
-    logger.info("Acquired repo in %.0fms", _elapsed_ms(t1))
+    acquire_ms = _elapsed_ms(t1)
+    logger.info("Acquired repo in %.0fms", acquire_ms)
+    if timing is not None:
+        timing.acquire_ms = acquire_ms
     try:
         t2 = time.perf_counter()
         files = discover_files(
@@ -375,7 +416,10 @@ def query(
         file_map = build_file_map(files)
         file_languages = {f.path: f.language for f in files}
         resolved_map = resolve_imports(import_map, file_map, adapters, file_languages)
-        logger.info("Parsed %d files in %.0fms", len(parsed_files), _elapsed_ms(t3))
+        parse_ms = _elapsed_ms(t3)
+        logger.info("Parsed %d files in %.0fms", len(parsed_files), parse_ms)
+        if timing is not None:
+            timing.parse_ms = parse_ms
 
         graph = DependencyGraph.from_parsed_files(parsed_files, resolved_map)
 
@@ -399,6 +443,8 @@ def query(
             edges = graph.file_edges()
             store.insert_edges(edges)
             bm25.build(all_chunks)
+            if timing is not None:
+                timing.index_ms = _elapsed_ms(t4)
 
             # Build vector index if configured
             vector_results_miss: list[tuple[object, float]] | None = None
@@ -422,6 +468,8 @@ def query(
 
             t6 = time.perf_counter()
             search_results = bm25.search(question, top_k=50)
+            if timing is not None:
+                timing.search_ms = _elapsed_ms(t6)
             bundle = assemble_context(
                 search_results=search_results,
                 graph=graph,
@@ -431,11 +479,16 @@ def query(
                 vector_results=vector_results_miss,  # type: ignore[arg-type]
                 scoring_weights=scoring_weights,
             )
+            if timing is not None:
+                timing.assemble_ms = bundle.retrieval_metadata.assembly_time_ms
+            bundle.retrieval_metadata.retrieval_time_ms = _elapsed_ms(t0)
             logger.info("Search + assemble in %.0fms", _elapsed_ms(t6))
         finally:
             store.close()
 
         logger.info("query() completed in %.0fms", _elapsed_ms(t0))
+        if timing is not None:
+            timing.total_ms = _elapsed_ms(t0)
         return bundle
     finally:
         cleanup()
@@ -485,11 +538,16 @@ def file_tree(
     max_depth: int = 5,
     language: str | None = None,
     config: Config | None = None,
+    timing: PipelineTiming | None = None,
 ) -> FileTree:
     """Return the annotated file structure of an indexed repository."""
-    store = _ensure_index(source, config)
+    t0 = time.perf_counter()
+    store = _ensure_index(source, config, timing=timing)
     try:
+        t_op = time.perf_counter()
         file_meta = store.get_file_metadata()
+        if timing is not None:
+            timing.search_ms = _elapsed_ms(t_op)
     finally:
         store.close()
 
@@ -544,6 +602,8 @@ def file_tree(
 
     entries = sorted(root_entries.values(), key=lambda e: (not e.is_directory, e.path))
 
+    if timing is not None:
+        timing.total_ms = _elapsed_ms(t0)
     return FileTree(
         root=source.local_path or source.url or "",
         entries=entries,
@@ -583,11 +643,16 @@ def file_outline(
     source: RepoSource,
     file_path: str,
     config: Config | None = None,
+    timing: PipelineTiming | None = None,
 ) -> FileOutline:
     """Return the symbol hierarchy for a single file — no source code."""
-    store = _ensure_index(source, config)
+    t0 = time.perf_counter()
+    store = _ensure_index(source, config, timing=timing)
     try:
+        t_op = time.perf_counter()
         chunks = store.get_chunks_for_file(file_path)
+        if timing is not None:
+            timing.search_ms = _elapsed_ms(t_op)
     finally:
         store.close()
 
@@ -628,6 +693,8 @@ def file_outline(
         else:
             top_level.append(outline)
 
+    if timing is not None:
+        timing.total_ms = _elapsed_ms(t0)
     return FileOutline(
         file_path=file_path,
         language=language,
@@ -655,18 +722,25 @@ def search_symbols(
     language: str | None = None,
     limit: int = 20,
     config: Config | None = None,
+    timing: PipelineTiming | None = None,
 ) -> list[SymbolMatch]:
     """Search symbols by name across the indexed repository."""
-    store = _ensure_index(source, config)
+    t0 = time.perf_counter()
+    store = _ensure_index(source, config, timing=timing)
     try:
+        t_op = time.perf_counter()
         sym_kind = SymbolKind(kind) if kind else None
         chunks = store.search_symbols(query, kind=sym_kind, limit=limit)
+        if timing is not None:
+            timing.search_ms = _elapsed_ms(t_op)
     finally:
         store.close()
 
     if language:
         chunks = [c for c in chunks if c.language == language]
 
+    if timing is not None:
+        timing.total_ms = _elapsed_ms(t0)
     return [_chunk_to_symbol_match(c) for c in chunks[:limit]]
 
 
@@ -674,14 +748,21 @@ def get_symbol(
     source: RepoSource,
     symbol_id: str,
     config: Config | None = None,
+    timing: PipelineTiming | None = None,
 ) -> SymbolSource | None:
     """Retrieve the full source code of a single symbol by its stable ID."""
-    store = _ensure_index(source, config)
+    t0 = time.perf_counter()
+    store = _ensure_index(source, config, timing=timing)
     try:
+        t_op = time.perf_counter()
         chunk = store.get_chunk_by_symbol_id(symbol_id)
+        if timing is not None:
+            timing.search_ms = _elapsed_ms(t_op)
     finally:
         store.close()
 
+    if timing is not None:
+        timing.total_ms = _elapsed_ms(t0)
     if chunk is None:
         return None
     return _chunk_to_symbol_source(chunk)
@@ -691,17 +772,67 @@ def get_symbols_batch(
     source: RepoSource,
     symbol_ids: list[str],
     config: Config | None = None,
+    timing: PipelineTiming | None = None,
 ) -> list[SymbolSource | None]:
     """Batch retrieve N symbols by their stable IDs. Preserves input order."""
     if len(symbol_ids) > 50:
         raise ValueError(f"Maximum 50 symbol IDs per batch, got {len(symbol_ids)}")
 
-    store = _ensure_index(source, config)
+    t0 = time.perf_counter()
+    store = _ensure_index(source, config, timing=timing)
     try:
+        t_op = time.perf_counter()
         chunks = store.get_chunks_by_symbol_ids(symbol_ids)
+        if timing is not None:
+            timing.search_ms = _elapsed_ms(t_op)
     finally:
         store.close()
 
     # Preserve input order: build lookup by symbol_id, map back
     by_sid: dict[str, CodeChunk] = {c.symbol_id: c for c in chunks if c.symbol_id}
+    if timing is not None:
+        timing.total_ms = _elapsed_ms(t0)
     return [_chunk_to_symbol_source(by_sid[sid]) if sid in by_sid else None for sid in symbol_ids]
+
+
+# ---------------------------------------------------------------------------
+# Token efficiency utilities
+# ---------------------------------------------------------------------------
+
+
+def get_repo_total_tokens(
+    source: RepoSource,
+    config: Config | None = None,
+) -> int:
+    """Return the total token count across all indexed chunks for a repository."""
+    store = _ensure_index(source, config)
+    try:
+        return store.get_total_tokens()
+    finally:
+        store.close()
+
+
+def get_file_token_count(
+    source: RepoSource,
+    file_path: str,
+    config: Config | None = None,
+) -> int:
+    """Return the total token count for a single file in an indexed repository."""
+    store = _ensure_index(source, config)
+    try:
+        return store.get_file_tokens(file_path)
+    finally:
+        store.close()
+
+
+def get_files_token_count(
+    source: RepoSource,
+    file_paths: list[str],
+    config: Config | None = None,
+) -> int:
+    """Return the total token count across unique files in an indexed repository."""
+    store = _ensure_index(source, config)
+    try:
+        return store.get_files_tokens(file_paths)
+    finally:
+        store.close()
