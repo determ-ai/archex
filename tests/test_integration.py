@@ -8,6 +8,8 @@ from archex.api import analyze, compare, query
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from archex.models import FileTreeEntry
 from archex.models import (
     ArchProfile,
     CodeChunk,
@@ -15,6 +17,7 @@ from archex.models import (
     Config,
     ContextBundle,
     IndexConfig,
+    PipelineTiming,
     RepoSource,
     ScoringWeights,
 )
@@ -374,3 +377,334 @@ class TestGetSymbolsBatchEndToEnd:
         source = RepoSource(local_path=str(python_simple_repo))
         results = get_symbols_batch(source, symbol_ids=[], config=Config(cache=False))
         assert results == []
+
+
+class TestTokenEfficiencyReporting:
+    """E2E tests for token efficiency reporting across CLI and MCP."""
+
+    def test_cli_query_timing_shows_savings(self, python_simple_repo: Path) -> None:
+        from click.testing import CliRunner
+
+        from archex.cli.main import cli
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["query", str(python_simple_repo), "what classes exist?", "--timing"],
+        )
+        assert result.exit_code == 0, result.output
+        assert "[savings]" in result.output
+        assert "tokens returned" in result.output
+        assert "Raw equivalent:" in result.output
+        assert "[timing]" in result.output
+        # Phase timing: should show acquire or cache hit
+        output = result.output
+        assert "Acquired repo" in output or "Cache hit" in output
+
+    def test_api_token_utilities(self, python_simple_repo: Path) -> None:
+        from archex.api import get_file_token_count, get_files_token_count, get_repo_total_tokens
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        config = Config(cache=False)
+
+        total = get_repo_total_tokens(source, config)
+        assert total > 0
+
+        # Individual file tokens should be <= total
+        file_tokens = get_file_token_count(source, "utils.py", config)
+        assert 0 <= file_tokens <= total
+
+        # Multi-file query should sum correctly
+        multi = get_files_token_count(source, ["utils.py", "models.py"], config)
+        assert multi > 0
+        assert multi <= total
+
+    def test_mcp_analyze_returns_meta(self, python_simple_repo: Path) -> None:
+        import json
+
+        from archex.integrations.mcp import handle_analyze_repo
+
+        raw = handle_analyze_repo(str(python_simple_repo), "json")
+        parsed = json.loads(raw)
+        assert "content" in parsed
+        assert "_meta" in parsed
+        meta = parsed["_meta"]
+        assert meta["tool_name"] == "analyze_repo"
+        assert meta["tokens_returned"] > 0
+        assert meta["tokens_raw_equivalent"] > 0
+        assert isinstance(meta["savings_pct"], float)
+        assert meta["strategy"] == "full_analysis"
+
+    def test_mcp_query_returns_meta(self, python_simple_repo: Path) -> None:
+        import json
+
+        from archex.integrations.mcp import handle_query_repo
+
+        raw = handle_query_repo(str(python_simple_repo), "what functions exist?")
+        parsed = json.loads(raw)
+        assert "content" in parsed
+        assert "_meta" in parsed
+        meta = parsed["_meta"]
+        assert meta["tool_name"] == "query_repo"
+        assert meta["tokens_returned"] > 0
+        assert meta["strategy"] == "bm25+graph"
+
+
+class TestPipelineTimingAPI:
+    """E2E tests that API functions correctly populate PipelineTiming."""
+
+    def test_analyze_populates_timing(self, python_simple_repo: Path) -> None:
+        source = RepoSource(local_path=str(python_simple_repo))
+        pt = PipelineTiming()
+        profile = analyze(source, config=Config(languages=["python"]), timing=pt)
+
+        assert isinstance(profile, ArchProfile)
+        assert pt.total_ms > 0
+        assert pt.acquire_ms >= 0
+        assert pt.parse_ms > 0
+        assert pt.index_ms >= 0
+        assert pt.cached is False
+
+    def test_query_populates_timing_cache_miss(self, python_simple_repo: Path) -> None:
+        source = RepoSource(local_path=str(python_simple_repo))
+        pt = PipelineTiming()
+        bundle = query(
+            source,
+            "what classes exist",
+            config=Config(languages=["python"], cache=False),
+            timing=pt,
+        )
+
+        assert isinstance(bundle, ContextBundle)
+        assert pt.total_ms > 0
+        assert pt.acquire_ms >= 0
+        assert pt.parse_ms > 0
+        assert pt.search_ms >= 0
+        assert pt.assemble_ms >= 0
+        assert pt.cached is False
+
+    def test_query_populates_timing_cache_hit(
+        self, python_simple_repo: Path, tmp_path: Path
+    ) -> None:
+        source = RepoSource(local_path=str(python_simple_repo))
+        cache_dir = str(tmp_path / "cache_timing")
+        config = Config(languages=["python"], cache=True, cache_dir=cache_dir)
+
+        # First call: cache miss — primes the cache
+        query(source, "classes", config=config)
+
+        # Second call: cache hit — with timing
+        pt = PipelineTiming()
+        bundle = query(source, "classes", config=config, timing=pt)
+
+        assert isinstance(bundle, ContextBundle)
+        assert pt.total_ms > 0
+        assert pt.cached is True
+        assert pt.search_ms >= 0
+        assert pt.assemble_ms >= 0
+        # acquire/parse should be 0 on cache hit
+        assert pt.acquire_ms == 0.0
+        assert pt.parse_ms == 0.0
+
+    def test_file_tree_populates_timing(self, python_simple_repo: Path) -> None:
+        from archex.api import file_tree
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        pt = PipelineTiming()
+        result = file_tree(source, config=Config(languages=["python"], cache=False), timing=pt)
+
+        assert result.total_files > 0
+        assert pt.total_ms > 0
+        assert pt.search_ms >= 0
+        assert pt.cached is False
+
+    def test_file_outline_populates_timing(self, python_simple_repo: Path) -> None:
+        import os
+
+        from archex.api import file_outline
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        py_files = [f for f in os.listdir(python_simple_repo) if f.endswith(".py")]
+        assert py_files
+
+        pt = PipelineTiming()
+        result = file_outline(
+            source,
+            file_path=py_files[0],
+            config=Config(languages=["python"], cache=False),
+            timing=pt,
+        )
+
+        assert result.file_path == py_files[0]
+        assert pt.total_ms > 0
+        assert pt.search_ms >= 0
+
+    def test_search_symbols_populates_timing(self, python_simple_repo: Path) -> None:
+        from archex.api import search_symbols
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        pt = PipelineTiming()
+        results = search_symbols(
+            source, query="class", config=Config(languages=["python"], cache=False), timing=pt
+        )
+
+        assert isinstance(results, list)
+        assert pt.total_ms > 0
+        assert pt.search_ms >= 0
+
+    def test_get_symbol_populates_timing(self, python_simple_repo: Path) -> None:
+        from archex.api import get_symbol, search_symbols
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        config = Config(languages=["python"], cache=False)
+
+        matches = search_symbols(source, query="class", config=config)
+        assert len(matches) > 0, "Fixture must have searchable symbols"
+
+        pt = PipelineTiming()
+        result = get_symbol(source, symbol_id=matches[0].symbol_id, config=config, timing=pt)
+        assert result is not None
+        assert pt.total_ms > 0
+        assert pt.search_ms >= 0
+
+    def test_get_symbols_batch_populates_timing(self, python_simple_repo: Path) -> None:
+        from archex.api import get_symbols_batch, search_symbols
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        config = Config(languages=["python"], cache=False)
+
+        matches = search_symbols(source, query="class", config=config)
+        assert len(matches) > 0, "Fixture must have searchable symbols"
+
+        pt = PipelineTiming()
+        ids = [matches[0].symbol_id]
+        results = get_symbols_batch(source, symbol_ids=ids, config=config, timing=pt)
+        assert len(results) == 1
+        assert pt.total_ms > 0
+        assert pt.search_ms >= 0
+
+    def test_ensure_index_cache_hit_timing(self, python_simple_repo: Path, tmp_path: Path) -> None:
+        """Verify _ensure_index sets cached=True and index_ms on cache hit."""
+        from archex.api import file_tree
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        cache_dir = str(tmp_path / "cache_idx")
+        config = Config(languages=["python"], cache=True, cache_dir=cache_dir)
+
+        # Prime cache
+        file_tree(source, config=config)
+
+        # Second call — cache hit
+        pt = PipelineTiming()
+        file_tree(source, config=config, timing=pt)
+        assert pt.cached is True
+        assert pt.index_ms >= 0
+        assert pt.total_ms > 0
+
+    def test_cli_analyze_timing(self, python_simple_repo: Path) -> None:
+        from click.testing import CliRunner
+
+        from archex.cli.main import cli
+
+        runner = CliRunner()
+        result = runner.invoke(
+            cli,
+            ["analyze", str(python_simple_repo), "--timing"],
+        )
+        assert result.exit_code == 0, result.output
+        assert "[savings]" in result.output
+        assert "[timing]" in result.output
+        assert "Acquired repo" in result.output or "Cache hit" in result.output
+
+
+class TestGetParentQname:
+    """Unit tests for _get_parent_qname helper."""
+
+    def test_double_colon_separator(self) -> None:
+        from archex.api import _get_parent_qname  # pyright: ignore[reportPrivateUsage]
+
+        assert _get_parent_qname("Foo::bar") == "Foo"
+
+    def test_double_colon_nested(self) -> None:
+        from archex.api import _get_parent_qname  # pyright: ignore[reportPrivateUsage]
+
+        assert _get_parent_qname("ns::Foo::bar") == "ns::Foo"
+
+    def test_dot_separator(self) -> None:
+        from archex.api import _get_parent_qname  # pyright: ignore[reportPrivateUsage]
+
+        assert _get_parent_qname("Foo.bar") == "Foo"
+
+    def test_no_separator(self) -> None:
+        from archex.api import _get_parent_qname  # pyright: ignore[reportPrivateUsage]
+
+        assert _get_parent_qname("standalone") is None
+
+
+class TestAddFileToTree:
+    """Unit tests for _add_file_to_tree helper."""
+
+    def test_creates_missing_root_entry(self) -> None:
+        from archex.api import _add_file_to_tree  # pyright: ignore[reportPrivateUsage]
+        from archex.models import FileTreeEntry
+
+        root: dict[str, FileTreeEntry] = {}
+        file_entry = FileTreeEntry(path="src/main.py", language="python", lines=10)
+        _add_file_to_tree(root, ["src", "main.py"], file_entry)
+
+        assert "src" in root
+        assert root["src"].is_directory is True
+        assert file_entry in root["src"].children
+
+    def test_returns_early_on_missing_intermediate(self) -> None:
+        from archex.api import _add_file_to_tree  # pyright: ignore[reportPrivateUsage]
+        from archex.models import FileTreeEntry
+
+        root: dict[str, FileTreeEntry] = {
+            "src": FileTreeEntry(path="src", is_directory=True),
+        }
+        # "sub" doesn't exist as a child of "src", so the file can't be placed
+        file_entry = FileTreeEntry(path="src/sub/deep.py", language="python", lines=5)
+        _add_file_to_tree(root, ["src", "sub", "deep.py"], file_entry)
+
+        # File should NOT have been added (intermediate "sub" missing)
+        assert len(root["src"].children) == 0
+
+
+class TestFileTreeDepthLimit:
+    """Test file_tree depth limiting with deeply nested files."""
+
+    def test_depth_limit_truncates_deep_paths(self, python_simple_repo: Path) -> None:
+        """Verify max_depth=1 triggers the break guard on nested files."""
+        from archex.api import file_tree
+
+        # python_simple has services/auth.py (depth 2)
+        source = RepoSource(local_path=str(python_simple_repo))
+        result = file_tree(source, max_depth=1, config=Config(languages=["python"], cache=False))
+
+        # Files at depth > 1 should not appear as entries
+        all_paths = self._collect_paths(result.entries)
+        for path in all_paths:
+            depth = path.count("/")
+            assert depth <= 1, f"Path {path} exceeds max_depth=1"
+
+    def test_depth_zero_shows_only_root_files(self, python_simple_repo: Path) -> None:
+        from archex.api import file_tree
+
+        source = RepoSource(local_path=str(python_simple_repo))
+        result = file_tree(source, max_depth=0, config=Config(languages=["python"], cache=False))
+
+        # No files should be included (all have depth >= 0 in parts)
+        # max_depth=0 means len(parts) - 1 < 0 is never true for any file
+        assert result.total_files > 0  # metadata still counted
+        # But no entries should be in the tree
+        assert len(result.entries) == 0
+
+    @staticmethod
+    def _collect_paths(entries: list[FileTreeEntry]) -> list[str]:
+        paths: list[str] = []
+        for e in entries:
+            if not e.is_directory:
+                paths.append(e.path)
+            paths.extend(TestFileTreeDepthLimit._collect_paths(e.children))
+        return paths
