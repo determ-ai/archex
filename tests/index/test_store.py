@@ -373,3 +373,47 @@ def test_get_file_metadata(store: IndexStore) -> None:
 def test_get_file_metadata_empty_store(store: IndexStore) -> None:
     meta = store.get_file_metadata()
     assert meta == []
+
+
+# ---------------------------------------------------------------------------
+# Token aggregation methods
+# ---------------------------------------------------------------------------
+
+
+def test_get_total_tokens(store: IndexStore) -> None:
+    store.insert_chunks(SAMPLE_CHUNKS)
+    # utils.py=20 + auth.py=25 + models.py=35
+    assert store.get_total_tokens() == 80
+
+
+def test_get_total_tokens_empty(store: IndexStore) -> None:
+    assert store.get_total_tokens() == 0
+
+
+def test_get_file_tokens(store: IndexStore) -> None:
+    store.insert_chunks(SAMPLE_CHUNKS)
+    assert store.get_file_tokens("utils.py") == 20
+    assert store.get_file_tokens("auth.py") == 25
+    assert store.get_file_tokens("models.py") == 35
+
+
+def test_get_file_tokens_missing_file(store: IndexStore) -> None:
+    store.insert_chunks(SAMPLE_CHUNKS)
+    assert store.get_file_tokens("nonexistent.py") == 0
+
+
+def test_get_files_tokens(store: IndexStore) -> None:
+    store.insert_chunks(SAMPLE_CHUNKS)
+    assert store.get_files_tokens(["utils.py", "auth.py"]) == 45
+    assert store.get_files_tokens(["models.py"]) == 35
+
+
+def test_get_files_tokens_deduplicates(store: IndexStore) -> None:
+    store.insert_chunks(SAMPLE_CHUNKS)
+    # Duplicate paths should be deduplicated
+    assert store.get_files_tokens(["utils.py", "utils.py", "auth.py"]) == 45
+
+
+def test_get_files_tokens_empty_list(store: IndexStore) -> None:
+    store.insert_chunks(SAMPLE_CHUNKS)
+    assert store.get_files_tokens([]) == 0

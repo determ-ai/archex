@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal
 
@@ -561,6 +562,19 @@ class TokenMeta(BaseModel):
     cached: bool = False
     index_time_ms: float = 0.0
     query_time_ms: float = 0.0
+
+
+@dataclass
+class PipelineTiming:
+    """Per-phase timing breakdown populated by API functions."""
+
+    acquire_ms: float = 0.0
+    parse_ms: float = 0.0
+    index_ms: float = 0.0
+    search_ms: float = 0.0
+    assemble_ms: float = 0.0
+    total_ms: float = 0.0
+    cached: bool = False
 
 
 # ---------------------------------------------------------------------------

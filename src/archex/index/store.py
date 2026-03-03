@@ -252,6 +252,31 @@ class IndexStore:
             chunks = [c for c in chunks if c.symbol_kind == kind]
         return chunks
 
+    def get_total_tokens(self) -> int:
+        """Sum of token_count across all chunks in the store."""
+        row = self._conn.execute("SELECT COALESCE(SUM(token_count), 0) FROM chunks").fetchone()
+        return int(row[0])
+
+    def get_file_tokens(self, file_path: str) -> int:
+        """Sum of token_count for chunks in a single file."""
+        row = self._conn.execute(
+            "SELECT COALESCE(SUM(token_count), 0) FROM chunks WHERE file_path = ?",
+            (file_path,),
+        ).fetchone()
+        return int(row[0])
+
+    def get_files_tokens(self, file_paths: list[str]) -> int:
+        """Sum of token_count across unique files (deduplicates paths)."""
+        if not file_paths:
+            return 0
+        unique = list(set(file_paths))
+        placeholders = ",".join("?" for _ in unique)
+        row = self._conn.execute(
+            f"SELECT COALESCE(SUM(token_count), 0) FROM chunks WHERE file_path IN ({placeholders})",
+            unique,
+        ).fetchone()
+        return int(row[0])
+
     def get_edges(self) -> list[Edge]:
         cur = self._conn.execute("SELECT source, target, kind, location FROM edges")
         return [
