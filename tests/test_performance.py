@@ -190,9 +190,9 @@ class TestNomicEmbedderCaching:
     def test_cache_dir_string_expands_home(self, tmp_path: Path) -> None:
         """cache_dir as string is expanded (expanduser) and used as base."""
         with (
+            patch.dict("sys.modules", {"onnxruntime": MagicMock(), "tokenizers": MagicMock()}),
             patch("onnxruntime.InferenceSession"),
             patch("tokenizers.Tokenizer"),
-            patch.dict("sys.modules", {"onnxruntime": MagicMock(), "tokenizers": MagicMock()}),
         ):
             from archex.index.embeddings.nomic import NomicCodeEmbedder
 

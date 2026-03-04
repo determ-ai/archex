@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
@@ -277,10 +278,30 @@ class TestRunArchexQuery:
         assert result.tokens_raw_baseline >= 0
 
 
+class _StubEmbedder:
+    """Deterministic stub embedder for hybrid tests without onnxruntime."""
+
+    @property
+    def dimension(self) -> int:
+        return 64
+
+    def encode(self, texts: list[str]) -> list[list[float]]:
+        import hashlib
+
+        result: list[list[float]] = []
+        for t in texts:
+            h = hashlib.sha256(t.encode()).digest()
+            vec = [float(b) / 255.0 for b in h[: self.dimension]]
+            result.append(vec)
+        return result
+
+
+def _stub_get_embedder(_index_config: object) -> _StubEmbedder:
+    return _StubEmbedder()
+
+
 class TestRunArchexQueryHybrid:
     def test_hybrid_strategy(self, python_simple_repo: Path) -> None:
-        from archex.exceptions import ArchexIndexError
-
         task = BenchmarkTask(
             task_id="test",
             repo="test/repo",
@@ -289,10 +310,8 @@ class TestRunArchexQueryHybrid:
             expected_files=["main.py"],
             token_budget=4096,
         )
-        try:
+        with patch("archex.api._get_embedder", _stub_get_embedder):
             result = run_archex_query_hybrid(task, python_simple_repo)
-        except ArchexIndexError:
-            pytest.skip("Vector dependencies not installed")
         assert result.strategy == Strategy.ARCHEX_QUERY_HYBRID
         assert result.tokens_total >= 0
         assert result.tool_calls == 1
@@ -301,8 +320,6 @@ class TestRunArchexQueryHybrid:
         assert 0.0 <= result.precision <= 1.0
 
     def test_hybrid_recall_precision(self, python_simple_repo: Path) -> None:
-        from archex.exceptions import ArchexIndexError
-
         task = BenchmarkTask(
             task_id="test",
             repo="test/repo",
@@ -311,10 +328,8 @@ class TestRunArchexQueryHybrid:
             expected_files=["services/auth.py", "main.py"],
             token_budget=8192,
         )
-        try:
+        with patch("archex.api._get_embedder", _stub_get_embedder):
             result = run_archex_query_hybrid(task, python_simple_repo)
-        except ArchexIndexError:
-            pytest.skip("Vector dependencies not installed")
         # Should return files and compute metrics
         assert result.files_accessed >= 0
         assert isinstance(result.recall, float)
