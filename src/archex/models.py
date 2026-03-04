@@ -8,6 +8,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, model_validator
 
+from archex.integrations.lsap_models import LSAPEnrichment  # noqa: TCH001
+
 # ---------------------------------------------------------------------------
 # Enumerations
 # ---------------------------------------------------------------------------
@@ -615,6 +617,7 @@ class SymbolSource(BaseModel):
     source: str
     imports_context: str = ""
     token_count: int = 0
+    lsap_enrichment: LSAPEnrichment | None = None
 
 
 class TokenMeta(BaseModel):
