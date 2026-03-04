@@ -17,11 +17,17 @@ def _make_result(
     savings: float = 0.0,
     recall: float = 1.0,
     precision: float = 1.0,
+    tokens_input: int = 2000,
+    tokens_output: int = 1000,
+    token_efficiency: float = 0.5,
 ) -> BenchmarkResult:
     return BenchmarkResult(
         task_id="test",
         strategy=strategy,
         tokens_total=tokens,
+        tokens_input=tokens_input,
+        tokens_output=tokens_output,
+        token_efficiency=token_efficiency,
         tool_calls=1,
         files_accessed=3,
         recall=recall,
@@ -56,6 +62,9 @@ class TestFormatMarkdown:
     def test_contains_table_header(self) -> None:
         md = format_markdown(_make_report())
         assert "| Strategy |" in md
+        assert "Tokens In" in md
+        assert "Tokens Out" in md
+        assert "Efficiency" in md
         assert "nDCG" in md
         assert "MAP" in md
 
@@ -99,6 +108,7 @@ class TestFormatSummary:
         assert "| Strategy |" in summary
         assert "raw_files" in summary
         assert "archex_query" in summary
+        assert "Avg Efficiency" in summary
         assert "Avg nDCG" in summary
         assert "Avg MAP" in summary
 

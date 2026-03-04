@@ -54,6 +54,7 @@ def test_save_load_baseline_roundtrip() -> None:
     assert baseline.entries[0].task_id == "test_task"
     assert baseline.entries[0].ndcg == 0.7
     assert baseline.entries[0].map_score == 0.6
+    assert baseline.entries[0].token_efficiency == 0.0
 
     # Roundtrip through JSON
     data = baseline.model_dump()
@@ -62,6 +63,7 @@ def test_save_load_baseline_roundtrip() -> None:
     assert loaded.entries[0].recall == 0.8
     assert loaded.entries[0].ndcg == 0.7
     assert loaded.entries[0].map_score == 0.6
+    assert loaded.entries[0].token_efficiency == 0.0
 
 
 def test_compare_baseline_detects_regression() -> None:

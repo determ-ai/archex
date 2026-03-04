@@ -17,16 +17,19 @@ def format_markdown(report: BenchmarkReport) -> str:
     lines.append(f"**Baseline tokens:** {report.baseline_tokens:,}")
     lines.append("")
     header = (
-        "| Strategy | Tokens | Savings | Recall | Precision "
-        "| F1 | MRR | nDCG | MAP | Files | Time (ms) |"
+        "| Strategy | Tokens | Tokens In | Tokens Out | Efficiency | Savings "
+        "| Recall | Precision | F1 | MRR | nDCG | MAP | Files | Time (ms) |"
     )
     lines.append(header)
     lines.append(
-        "|----------|--------|---------|--------|-----------|------|------|------|------|-------|-----------|"
-    )  # noqa: E501
+        "|----------|--------|-----------|------------|------------|--------"
+        "|--------|-----------|------|------|------|------|-------|-----------|"
+    )
     for r in report.results:
         lines.append(
-            f"| {r.strategy.value} | {r.tokens_total:,} | {r.savings_vs_raw:.1f}% "
+            f"| {r.strategy.value} | {r.tokens_total:,} "
+            f"| {r.tokens_input:,} | {r.tokens_output:,} | {r.token_efficiency:.2f} "
+            f"| {r.savings_vs_raw:.1f}% "
             f"| {r.recall:.2f} | {r.precision:.2f} | {r.f1_score:.2f} | {r.mrr:.2f} "
             f"| {r.ndcg:.2f} | {r.map_score:.2f} "
             f"| {r.files_accessed} | {r.wall_time_ms:.0f} |"
@@ -58,6 +61,7 @@ def format_summary(reports: list[BenchmarkReport]) -> str:
     strategy_mrrs: dict[str, list[float]] = {}
     strategy_ndcgs: dict[str, list[float]] = {}
     strategy_maps: dict[str, list[float]] = {}
+    strategy_efficiencies: dict[str, list[float]] = {}
 
     for report in reports:
         for r in report.results:
@@ -69,13 +73,14 @@ def format_summary(reports: list[BenchmarkReport]) -> str:
             strategy_mrrs.setdefault(name, []).append(r.mrr)
             strategy_ndcgs.setdefault(name, []).append(r.ndcg)
             strategy_maps.setdefault(name, []).append(r.map_score)
+            strategy_efficiencies.setdefault(name, []).append(r.token_efficiency)
 
     lines.append(
-        "| Strategy | Avg Tokens | Avg Savings | Avg Recall | Avg F1 "
+        "| Strategy | Avg Tokens | Avg Savings | Avg Efficiency | Avg Recall | Avg F1 "
         "| Avg MRR | Avg nDCG | Avg MAP | Tasks |"
     )
     lines.append(
-        "|----------|------------|-------------|------------|--------"
+        "|----------|------------|-------------|----------------|------------|--------"
         "|---------|----------|---------|-------|"
     )
 
@@ -87,6 +92,7 @@ def format_summary(reports: list[BenchmarkReport]) -> str:
         mrrs_list = strategy_mrrs[name]
         ndcgs_list = strategy_ndcgs[name]
         maps_list = strategy_maps[name]
+        effs_list = strategy_efficiencies[name]
         count = len(tokens_list)
         avg_tokens = sum(tokens_list) / count
         avg_recall = sum(recalls_list) / count
@@ -95,8 +101,9 @@ def format_summary(reports: list[BenchmarkReport]) -> str:
         avg_mrr = sum(mrrs_list) / count
         avg_ndcg = sum(ndcgs_list) / count
         avg_map = sum(maps_list) / count
+        avg_eff = sum(effs_list) / count
         lines.append(
-            f"| {name} | {avg_tokens:,.0f} | {avg_savings:.1f}% "
+            f"| {name} | {avg_tokens:,.0f} | {avg_savings:.1f}% | {avg_eff:.2f} "
             f"| {avg_recall:.2f} | {avg_f1:.2f} | {avg_mrr:.2f} "
             f"| {avg_ndcg:.2f} | {avg_map:.2f} | {count} |"
         )
@@ -114,7 +121,7 @@ def format_strategy_comparison(reports: list[BenchmarkReport]) -> str:
     lines.append("# Strategy Comparison")
     lines.append("")
 
-    metrics = ("recall", "precision", "f1_score", "mrr", "ndcg", "map_score")
+    metrics = ("recall", "precision", "f1_score", "mrr", "ndcg", "map_score", "token_efficiency")
     metric_labels = {
         "recall": "Recall",
         "precision": "Precision",
@@ -122,6 +129,7 @@ def format_strategy_comparison(reports: list[BenchmarkReport]) -> str:
         "mrr": "MRR",
         "ndcg": "nDCG",
         "map_score": "MAP",
+        "token_efficiency": "Efficiency",
     }
 
     # Per-task tables

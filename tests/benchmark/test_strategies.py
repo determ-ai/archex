@@ -12,6 +12,7 @@ from archex.benchmark.strategies import (
     compute_ndcg,
     compute_precision,
     compute_recall,
+    compute_symbol_recall,
     count_file_tokens,
     extract_keywords,
     run_archex_query,
@@ -163,6 +164,23 @@ class TestCountFileTokens:
         assert tokens == 0
 
 
+class TestComputeSymbolRecall:
+    def test_full_recall(self) -> None:
+        assert compute_symbol_recall({"foo", "bar"}, ["foo", "bar"]) == 1.0
+
+    def test_partial_recall(self) -> None:
+        assert compute_symbol_recall({"foo"}, ["foo", "bar"]) == 0.5
+
+    def test_zero_recall(self) -> None:
+        assert compute_symbol_recall({"baz"}, ["foo", "bar"]) == 0.0
+
+    def test_empty_expected(self) -> None:
+        assert compute_symbol_recall({"foo"}, []) == 0.0
+
+    def test_empty_results(self) -> None:
+        assert compute_symbol_recall(set(), ["foo"]) == 0.0
+
+
 class TestRunRawFiles:
     def test_raw_files_strategy(self, python_simple_repo: Path) -> None:
         task = BenchmarkTask(
@@ -179,6 +197,11 @@ class TestRunRawFiles:
         assert result.precision == 1.0
         assert result.savings_vs_raw == 0.0
         assert result.files_accessed == 2
+        # Token efficiency fields
+        assert result.tokens_input == result.tokens_total
+        assert result.tokens_output == result.tokens_total
+        assert result.token_efficiency == 1.0
+        assert result.tokens_raw_baseline == result.tokens_total
 
 
 class TestRunRawGrepped:
@@ -226,6 +249,11 @@ class TestRunRawGrepped:
         assert result.cached is False
         assert result.savings_vs_raw == 0.0  # Not yet backfilled
         assert result.tool_calls > 0  # At least one keyword searched
+        # Token efficiency + MRR fields
+        assert result.tokens_input >= 0
+        assert result.tokens_output >= 0
+        assert result.tokens_raw_baseline >= 0
+        assert isinstance(result.mrr, float)
 
 
 class TestRunArchexQuery:
@@ -243,10 +271,16 @@ class TestRunArchexQuery:
         assert result.tokens_total >= 0
         assert result.tool_calls == 1
         assert result.timing is not None
+        # Token efficiency fields
+        assert result.tokens_input >= 0
+        assert result.tokens_output >= 0
+        assert result.tokens_raw_baseline >= 0
 
 
 class TestRunArchexQueryHybrid:
     def test_hybrid_strategy(self, python_simple_repo: Path) -> None:
+        from archex.exceptions import ArchexIndexError
+
         task = BenchmarkTask(
             task_id="test",
             repo="test/repo",
@@ -255,7 +289,10 @@ class TestRunArchexQueryHybrid:
             expected_files=["main.py"],
             token_budget=4096,
         )
-        result = run_archex_query_hybrid(task, python_simple_repo)
+        try:
+            result = run_archex_query_hybrid(task, python_simple_repo)
+        except ArchexIndexError:
+            pytest.skip("Vector dependencies not installed")
         assert result.strategy == Strategy.ARCHEX_QUERY_HYBRID
         assert result.tokens_total >= 0
         assert result.tool_calls == 1
@@ -264,6 +301,8 @@ class TestRunArchexQueryHybrid:
         assert 0.0 <= result.precision <= 1.0
 
     def test_hybrid_recall_precision(self, python_simple_repo: Path) -> None:
+        from archex.exceptions import ArchexIndexError
+
         task = BenchmarkTask(
             task_id="test",
             repo="test/repo",
@@ -272,7 +311,10 @@ class TestRunArchexQueryHybrid:
             expected_files=["services/auth.py", "main.py"],
             token_budget=8192,
         )
-        result = run_archex_query_hybrid(task, python_simple_repo)
+        try:
+            result = run_archex_query_hybrid(task, python_simple_repo)
+        except ArchexIndexError:
+            pytest.skip("Vector dependencies not installed")
         # Should return files and compute metrics
         assert result.files_accessed >= 0
         assert isinstance(result.recall, float)

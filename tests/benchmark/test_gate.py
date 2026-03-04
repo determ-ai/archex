@@ -68,3 +68,19 @@ def test_check_gate_custom_thresholds() -> None:
     )
     violations = check_gate(reports, thresholds)
     assert violations == []
+
+
+def test_check_gate_token_efficiency_violation() -> None:
+    reports = [_make_report()]
+    thresholds = QualityThresholds(min_token_efficiency=0.5)
+    violations = check_gate(reports, thresholds)
+    violated_metrics = {v.metric for v in violations}
+    assert "token_efficiency" in violated_metrics
+
+
+def test_check_gate_token_efficiency_default_passes() -> None:
+    """Default min_token_efficiency=0.0 never triggers a violation."""
+    reports = [_make_report()]
+    violations = check_gate(reports)
+    violated_metrics = {v.metric for v in violations}
+    assert "token_efficiency" not in violated_metrics
