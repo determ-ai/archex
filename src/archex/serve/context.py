@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from archex.models import (
     CodeChunk,
     ContextBundle,
+    Module,
     RankedChunk,
     RetrievalMetadata,
     ScoringWeights,
@@ -36,11 +37,13 @@ def assemble_context(
     token_budget: int = 8192,
     vector_results: list[tuple[CodeChunk, float]] | None = None,
     scoring_weights: ScoringWeights | None = None,
+    modules: list[Module] | None = None,
 ) -> ContextBundle:
     """Assemble a token-budgeted ContextBundle from search results and a dependency graph.
 
     When vector_results is provided, uses Reciprocal Rank Fusion to merge BM25 and
     vector results before scoring.
+    When modules is provided, computes cohesion signal per chunk.
     """
     assembly_start = time.perf_counter()
     weights = scoring_weights or ScoringWeights()
@@ -95,16 +98,45 @@ def assemble_context(
     # Get structural centrality scores
     centrality = graph.structural_centrality()
 
+    # Build file-to-module mapping for cohesion signal
+    file_to_module: dict[str, Module] = {}
+    if modules:
+        for mod in modules:
+            for fp in mod.files:
+                file_to_module[fp] = mod
+
+    # Compute signal agreement (Jaccard of BM25 top-K and vector top-K)
+    signal_agreement: float | None = None
+    if vector_results:
+        k = 20
+        bm25_top_k = {chunk.file_path for chunk, _ in search_results[:k]}
+        vec_top_k = {chunk.file_path for chunk, _ in vector_results[:k]}
+        union = bm25_top_k | vec_top_k
+        if union:
+            signal_agreement = len(bm25_top_k & vec_top_k) / len(union)
+
+    # Candidate file set for cohesion computation
+    candidate_files = {c.file_path for c in candidate_map.values()}
+
     # Build RankedChunks
     ranked: list[RankedChunk] = []
     for chunk in candidate_map.values():
         relevance = bm25_by_id.get(chunk.id, 0.0)
         structural = centrality.get(chunk.file_path, 0.0)
         type_coverage = 0.5 if chunk.symbol_kind in _TYPE_LIKE else 0.0
+
+        # Cohesion signal: proportion of co-module files present * module cohesion
+        cohesion = 0.0
+        mod = file_to_module.get(chunk.file_path)
+        if mod and mod.files:
+            co_present = sum(1 for f in mod.files if f in candidate_files)
+            cohesion = (co_present / len(mod.files)) * mod.cohesion_score
+
         final = (
             weights.relevance * relevance
             + weights.structural * structural
             + weights.type_coverage * type_coverage
+            + weights.cohesion * cohesion
         )
         ranked.append(
             RankedChunk(
@@ -112,6 +144,7 @@ def assemble_context(
                 relevance_score=relevance,
                 structural_score=structural,
                 type_coverage_score=type_coverage,
+                cohesion_score=cohesion,
                 final_score=final,
             )
         )
@@ -170,6 +203,7 @@ def assemble_context(
         chunks_dropped=chunks_dropped,
         strategy=strategy,
         assembly_time_ms=assembly_ms,
+        signal_agreement=signal_agreement,
     )
 
     return ContextBundle(

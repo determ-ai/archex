@@ -6,7 +6,7 @@ import json
 import xml.etree.ElementTree as ET
 
 from archex.index.graph import DependencyGraph
-from archex.models import CodeChunk, ContextBundle, SymbolKind
+from archex.models import CodeChunk, ContextBundle, Module, SymbolKind
 from archex.serve.context import assemble_context
 from archex.serve.renderers.json import render_json
 from archex.serve.renderers.markdown import render_markdown
@@ -282,3 +282,91 @@ def test_empty_search_and_vector_results() -> None:
     bundle = assemble_context([], graph, [], "q", token_budget=1000, vector_results=[])
     assert bundle.chunks == []
     assert bundle.token_count == 0
+
+
+# ---------------------------------------------------------------------------
+# Cohesion signal tests
+# ---------------------------------------------------------------------------
+
+
+def test_cohesion_signal_boosts_co_module_files() -> None:
+    """Two files in the same module → cohesion > 0."""
+    graph = DependencyGraph()
+    graph.add_file_node("a.py")
+    graph.add_file_node("b.py")
+    graph.add_file_edge("a.py", "b.py", kind="imports")
+    c_a = make_chunk("ca", "a.py", token_count=10)
+    c_b = make_chunk("cb", "b.py", token_count=10)
+    mod = Module(
+        name="core",
+        root_path=".",
+        files=["a.py", "b.py"],
+        cohesion_score=0.8,
+    )
+    results = [(c_a, 1.0), (c_b, 0.5)]
+    bundle = assemble_context(
+        results, graph, [c_a, c_b], "q", token_budget=1000, modules=[mod],
+    )
+    for rc in bundle.chunks:
+        assert rc.cohesion_score > 0.0
+
+
+def test_cohesion_signal_zero_without_modules() -> None:
+    """No modules param → cohesion_score = 0.0."""
+    graph = DependencyGraph()
+    graph.add_file_node("a.py")
+    chunk = make_chunk("c1", "a.py", token_count=10)
+    results = [(chunk, 1.0)]
+    bundle = assemble_context(results, graph, [chunk], "q", token_budget=1000)
+    for rc in bundle.chunks:
+        assert rc.cohesion_score == 0.0
+
+
+def test_cohesion_signal_zero_for_low_cohesion_module() -> None:
+    """module.cohesion_score = 0.0 → signal = 0.0."""
+    graph = DependencyGraph()
+    graph.add_file_node("a.py")
+    chunk = make_chunk("c1", "a.py", token_count=10)
+    mod = Module(name="low", root_path=".", files=["a.py"], cohesion_score=0.0)
+    results = [(chunk, 1.0)]
+    bundle = assemble_context(
+        results, graph, [chunk], "q", token_budget=1000, modules=[mod],
+    )
+    for rc in bundle.chunks:
+        assert rc.cohesion_score == 0.0
+
+
+def test_signal_agreement_computed_with_vector() -> None:
+    """Both BM25 and vector results → agreement ∈ [0, 1]."""
+    graph = DependencyGraph()
+    graph.add_file_node("a.py")
+    graph.add_file_node("b.py")
+    c_a = make_chunk("ca", "a.py", token_count=10)
+    c_b = make_chunk("cb", "b.py", token_count=10)
+    bm25_results = [(c_a, 1.0)]
+    vec_results = [(c_a, 0.9), (c_b, 0.5)]
+    bundle = assemble_context(
+        bm25_results, graph, [c_a, c_b], "q",
+        token_budget=1000, vector_results=vec_results,
+    )
+    assert bundle.retrieval_metadata.signal_agreement is not None
+    assert 0.0 <= bundle.retrieval_metadata.signal_agreement <= 1.0
+
+
+def test_signal_agreement_none_without_vector() -> None:
+    """BM25 only → agreement is None."""
+    graph = DependencyGraph()
+    graph.add_file_node("a.py")
+    chunk = make_chunk("c1", "a.py", token_count=10)
+    results = [(chunk, 1.0)]
+    bundle = assemble_context(results, graph, [chunk], "q", token_budget=1000)
+    assert bundle.retrieval_metadata.signal_agreement is None
+
+
+def test_ranked_chunk_carries_cohesion_score() -> None:
+    """RankedChunk has cohesion_score field."""
+    from archex.models import RankedChunk
+
+    chunk = make_chunk("c1", "a.py", token_count=10)
+    rc = RankedChunk(chunk=chunk, cohesion_score=0.5)
+    assert rc.cohesion_score == 0.5
