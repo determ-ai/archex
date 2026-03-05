@@ -4,7 +4,7 @@
 [![PyPI](https://img.shields.io/pypi/v/archex)](https://pypi.org/project/archex/)
 [![Python](https://img.shields.io/pypi/pyversions/archex)](https://pypi.org/project/archex/)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-[![Coverage](https://img.shields.io/badge/coverage-92%25-brightgreen)](https://github.com/determ-ai/archex/actions/workflows/ci.yml)
+[![Coverage](https://codecov.io/gh/determ-ai/archex/graph/badge.svg)](https://codecov.io/gh/determ-ai/archex)
 
 Architecture extraction and codebase intelligence for the agentic era.
 
@@ -317,7 +317,7 @@ archex and an LSP MCP server can run as sibling tools, giving agents both struct
 
 #### Retrieval Quality
 
-`query()` retrieval quality measured against human-annotated expected files across 9 benchmark tasks (4 self-referential archex tasks + 5 external open-source repos). Token budget: 8,192. Strategy: BM25.
+`query()` retrieval quality measured against human-annotated expected files across 11 benchmark tasks (4 self-referential archex tasks + 7 external open-source repos). Token budget: 8,192. Strategy: BM25.
 
 | Task | Repository | Language | Recall | Precision | F1 | MRR |
 | ---- | ---------- | -------- | -----: | --------: | ---: | ---: |
@@ -325,17 +325,19 @@ archex and an LSP MCP server can run as sibling tools, giving agents both struct
 | mini_redis_async | tokio-rs/mini-redis | Rust | 1.00 | 0.176 | 0.300 | 1.00 |
 | click_decorators | pallets/click | Python | 0.67 | 0.286 | 0.400 | 1.00 |
 | gin_routing | gin-gonic/gin | Go | 0.67 | 0.083 | 0.148 | 0.08 |
+| fastapi_dependency_injection | tiangolo/fastapi | Python | 0.33 | 0.143 | 0.200 | 1.00 |
 | express_middleware | expressjs/express | JS | 0.33 | 0.056 | 0.095 | 0.08 |
-| archex_adapter_registry | . (self) | Python | 0.67 | 0.074 | 0.133 | 1.00 |
-| archex_delta_indexing | . (self) | Python | 0.67 | 0.118 | 0.200 | 0.50 |
-| archex_pattern_detection | . (self) | Python | 0.50 | 0.056 | 0.100 | 0.20 |
+| pydantic_validators | pydantic/pydantic | Python | 0.00 | 0.000 | 0.000 | 0.00 |
+| archex_adapter_registry | . (self) | Python | 0.67 | 0.067 | 0.121 | 1.00 |
+| archex_delta_indexing | . (self) | Python | 0.67 | 0.111 | 0.190 | 0.50 |
+| archex_pattern_detection | . (self) | Python | 0.50 | 0.053 | 0.095 | 0.20 |
 | archex_query_pipeline | . (self) | Python | 0.33 | 0.040 | 0.071 | 0.02 |
 
 **Median recall: 0.67. Median MRR: 0.50. Median F1: 0.148.**
 
 > **How to read this:** Recall measures what fraction of expected files appear in the context bundle. Precision measures what fraction of returned chunks are from expected files (low by design — archex includes dependency-expanded context beyond the strict expected set). MRR measures how early the first relevant file appears in the ranked results (1.0 = first position). Raw results in [`benchmarks/results/`](benchmarks/results/).
 >
-> **Honest assessment:** Recall is moderate — archex finds 2 of 3 expected files in the median case. MRR is strong for well-scoped queries (httpx, click, mini-redis) but weak for broad queries (express, archex_query_pipeline). Precision is structurally low because the 8K token budget packs many dependency-expanded chunks beyond the expected file set. F1 reflects this tension. These metrics will improve as the benchmark task suite expands and retrieval strategies are tuned.
+> **Honest assessment:** Recall is moderate — archex finds 2 of 3 expected files in the median case. MRR is strong for well-scoped queries (httpx, click, mini-redis, fastapi) but weak for broad queries (express, archex_query_pipeline) and large codebases with generic terminology (pydantic — 0% recall across 240+ files). Precision is structurally low because the 8K token budget packs dependency-expanded chunks beyond the strict expected set. BM25-only retrieval is the primary bottleneck; hybrid retrieval (BM25 + vector embeddings) is expected to improve recall on large repos where lexical matching alone cannot disambiguate.
 
 #### Token Efficiency
 
