@@ -308,6 +308,17 @@ def _build_adapters() -> dict[str, LanguageAdapter]:
     return default_adapter_registry.build_all()
 
 
+def _compute_top_k(total_chunks: int) -> int:
+    """Scale BM25 candidate pool with repo size."""
+    if total_chunks <= 100:
+        return 30
+    if total_chunks <= 500:
+        return 50
+    if total_chunks <= 2000:
+        return 100
+    return 150
+
+
 def analyze(
     source: RepoSource,
     config: Config | None = None,
@@ -449,6 +460,7 @@ def query(
                 stored_edges = store.get_edges()
                 graph = DependencyGraph.from_edges(stored_edges)
 
+                top_k = _compute_top_k(len(cached_chunks))
                 vector_results: list[tuple[object, float]] | None = None
                 if index_config.vector:
                     vec_path = cache.vector_path(cache_key)
@@ -464,12 +476,12 @@ def query(
                         )
                         embedder = _get_embedder(index_config)
                         if embedder is not None:
-                            vector_results = vec_idx.search(question, embedder, top_k=50)  # type: ignore[assignment]
+                            vector_results = vec_idx.search(question, embedder, top_k=top_k)  # type: ignore[assignment]
                             if timing is not None:
                                 timing.vector_used = True
 
                 t_search = time.perf_counter()
-                search_results = bm25.search(question, top_k=50)
+                search_results = bm25.search(question, top_k=top_k)
                 if timing is not None:
                     timing.search_ms = _elapsed_ms(t_search)
                 bundle = assemble_context(
@@ -547,6 +559,7 @@ def query(
 
             # Build vector index if configured
             vector_results_miss: list[tuple[object, float]] | None = None
+            top_k = _compute_top_k(len(all_chunks))
             if index_config.vector:
                 embedder = _get_embedder(index_config)
                 if embedder is not None:
@@ -555,7 +568,7 @@ def query(
                     t5 = time.perf_counter()
                     vec_idx = VectorIndex()
                     vec_idx.build(all_chunks, embedder)  # type: ignore[arg-type]
-                    vector_results_miss = vec_idx.search(question, embedder, top_k=50)  # type: ignore[assignment]
+                    vector_results_miss = vec_idx.search(question, embedder, top_k=top_k)  # type: ignore[assignment]
                     if timing is not None:
                         timing.vector_used = True
                     logger.info("Vector index built in %.0fms", _elapsed_ms(t5))
@@ -577,7 +590,7 @@ def query(
                 cache.put(cache_key, db_path)
 
             t6 = time.perf_counter()
-            search_results = bm25.search(question, top_k=50)
+            search_results = bm25.search(question, top_k=top_k)
             if timing is not None:
                 timing.search_ms = _elapsed_ms(t6)
             bundle = assemble_context(

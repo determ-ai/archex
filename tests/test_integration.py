@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from archex.api import analyze, compare, query
+from archex.api import _compute_top_k, analyze, compare, query
 
 if TYPE_CHECKING:
     from archex.models import FileTreeEntry
@@ -22,6 +22,16 @@ from archex.models import (
     RepoSource,
     ScoringWeights,
 )
+
+
+def test_compute_top_k_thresholds() -> None:
+    assert _compute_top_k(50) == 30
+    assert _compute_top_k(100) == 30
+    assert _compute_top_k(200) == 50
+    assert _compute_top_k(500) == 50
+    assert _compute_top_k(1000) == 100
+    assert _compute_top_k(2000) == 100
+    assert _compute_top_k(5000) == 150
 
 
 class TestAnalyzeEndToEnd:
