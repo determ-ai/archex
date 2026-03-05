@@ -54,3 +54,11 @@ jobs:
         with:
           name: test-results-${{ matrix.python-version }}
           path: results.xml
+
+      - name: Upload to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          flags: py${{ matrix.python-version }}
+          token: ${{ secrets.CODECOV_TOKEN }}

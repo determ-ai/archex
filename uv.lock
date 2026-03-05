@@ -206,6 +206,7 @@ version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
+    { name = "fastapi" },
     { name = "networkx" },
     { name = "pydantic" },
     { name = "pyyaml" },
@@ -219,6 +220,7 @@ dependencies = [
     { name = "tree-sitter-python" },
     { name = "tree-sitter-rust" },
     { name = "tree-sitter-typescript" },
+    { name = "uvicorn", extra = ["standard"] },
 ]
 
 [package.optional-dependencies]
@@ -277,6 +279,9 @@ web = [
 [package.dev-dependencies]
 dev = [
     { name = "numpy" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
     { name = "scipy" },
 ]
 
@@ -285,6 +290,7 @@ requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.30" },
     { name = "archex", extras = ["vector", "openai", "anthropic", "mcp", "langchain", "llamaindex", "language-pack"], marker = "extra == 'all'" },
     { name = "click", specifier = ">=8.1" },
+    { name = "fastapi", specifier = ">=0.115" },
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.115" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
     { name = "langchain-core", marker = "extra == 'langchain'", specifier = ">=0.2" },
@@ -315,6 +321,7 @@ requires-dist = [
     { name = "tree-sitter-python", specifier = ">=0.23" },
     { name = "tree-sitter-rust", specifier = ">=0.23" },
     { name = "tree-sitter-typescript", specifier = ">=0.23" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.34" },
     { name = "uvicorn", extras = ["standard"], marker = "extra == 'web'", specifier = ">=0.34" },
 ]
 provides-extras = ["vector", "vector-torch", "openai", "anthropic", "mcp", "langchain", "llamaindex", "lsap", "language-pack", "all", "web", "dev"]
@@ -322,6 +329,9 @@ provides-extras = ["vector", "vector-torch", "openai", "anthropic", "mcp", "lang
 [package.metadata.requires-dev]
 dev = [
     { name = "numpy", specifier = ">=2.4.2" },
+    { name = "pytest", specifier = ">=9.0.2" },
+    { name = "pytest-asyncio", specifier = ">=1.3.0" },
+    { name = "pytest-cov", specifier = ">=7.0.0" },
     { name = "scipy", specifier = ">=1.17.1" },
 ]
 
