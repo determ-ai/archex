@@ -370,3 +370,71 @@ def test_ranked_chunk_carries_cohesion_score() -> None:
     chunk = make_chunk("c1", "a.py", token_count=10)
     rc = RankedChunk(chunk=chunk, cohesion_score=0.5)
     assert rc.cohesion_score == 0.5
+
+
+# ---------------------------------------------------------------------------
+# BM25 propagation tests
+# ---------------------------------------------------------------------------
+
+
+def test_neighbor_of_high_bm25_seed_gets_relevance() -> None:
+    """Neighbor of a high-BM25 seed gets propagated relevance > 0."""
+    graph = make_graph_with_edges()
+    # auth.py → models.py edge exists
+    auth_chunk = make_chunk("c_auth", "auth.py", token_count=10)
+    models_chunk = make_chunk("c_models", "models.py", token_count=10)
+    # Only auth.py is a BM25 hit
+    results = [(auth_chunk, 5.0)]
+    bundle = assemble_context(results, graph, [auth_chunk, models_chunk], "q", token_budget=1000)
+    # models.py is a neighbor — should get propagated relevance
+    models_rc = next((rc for rc in bundle.chunks if rc.chunk.file_path == "models.py"), None)
+    assert models_rc is not None
+    assert models_rc.relevance_score > 0.0
+
+
+def test_direct_hit_outranks_neighbor() -> None:
+    """Direct BM25 hit has higher relevance than its neighbor."""
+    graph = make_graph_with_edges()
+    auth_chunk = make_chunk("c_auth", "auth.py", token_count=10)
+    models_chunk = make_chunk("c_models", "models.py", token_count=10)
+    results = [(auth_chunk, 5.0)]
+    bundle = assemble_context(results, graph, [auth_chunk, models_chunk], "q", token_budget=1000)
+    auth_rc = next(rc for rc in bundle.chunks if rc.chunk.file_path == "auth.py")
+    models_rc = next(rc for rc in bundle.chunks if rc.chunk.file_path == "models.py")
+    assert auth_rc.relevance_score > models_rc.relevance_score
+
+
+def test_isolated_node_unaffected_by_propagation() -> None:
+    """Node with no graph edges gets no propagated relevance."""
+    graph = DependencyGraph()
+    graph.add_file_node("a.py")
+    graph.add_file_node("b.py")
+    # No edges
+    chunk_a = make_chunk("ca", "a.py", token_count=10)
+    chunk_b = make_chunk("cb", "b.py", token_count=10)
+    results = [(chunk_a, 5.0)]
+    bundle = assemble_context(results, graph, [chunk_a, chunk_b], "q", token_budget=1000)
+    # b.py should NOT be included (no edge, no expansion)
+    included_files = {rc.chunk.file_path for rc in bundle.chunks}
+    assert "b.py" not in included_files
+
+
+def test_high_relevance_low_centrality_beats_low_relevance_high_centrality() -> None:
+    """With new weights (relevance=0.6), BM25 signal dominates over structural centrality."""
+    graph = DependencyGraph()
+    graph.add_file_node("hub.py")
+    graph.add_file_node("leaf.py")
+    # hub.py is highly central (many edges), leaf.py is not
+    for i in range(10):
+        node = f"dep{i}.py"
+        graph.add_file_node(node)
+        graph.add_file_edge(node, "hub.py", kind="imports")
+
+    hub_chunk = make_chunk("c_hub", "hub.py", token_count=10)
+    leaf_chunk = make_chunk("c_leaf", "leaf.py", token_count=10)
+    # leaf has much higher BM25 score
+    results = [(hub_chunk, 1.0), (leaf_chunk, 10.0)]
+    all_chunks = [hub_chunk, leaf_chunk]
+    bundle = assemble_context(results, graph, all_chunks, "q", token_budget=1000)
+    scores = {rc.chunk.file_path: rc.final_score for rc in bundle.chunks}
+    assert scores.get("leaf.py", 0) > scores.get("hub.py", 0)

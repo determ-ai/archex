@@ -141,8 +141,8 @@ class IndexConfig(BaseModel):
 
 
 class ScoringWeights(BaseModel):
-    relevance: float = 0.5
-    structural: float = 0.25
+    relevance: float = 0.6
+    structural: float = 0.15
     type_coverage: float = 0.1
     cohesion: float = 0.15
 

@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 _TYPE_LIKE = {SymbolKind.CLASS, SymbolKind.TYPE, SymbolKind.INTERFACE}
 
+NEIGHBOR_DECAY = 0.3
+
 
 def _estimate_tokens(chunk: CodeChunk) -> int:
     if chunk.token_count > 0:
@@ -118,10 +120,20 @@ def assemble_context(
     # Candidate file set for cohesion computation
     candidate_files = {c.file_path for c in candidate_map.values()}
 
+    # Propagate BM25 relevance to graph-expansion neighbors
+    neighbor_boost: dict[str, float] = {}
+    for file_path in seed_files:
+        seed_score = max(
+            (bm25_by_id.get(c.id, 0.0) for c in candidate_map.values() if c.file_path == file_path),
+            default=0.0,
+        )
+        for nb in graph.neighborhood(file_path, hops=1) - seed_files:
+            neighbor_boost[nb] = max(neighbor_boost.get(nb, 0.0), seed_score * NEIGHBOR_DECAY)
+
     # Build RankedChunks
     ranked: list[RankedChunk] = []
     for chunk in candidate_map.values():
-        relevance = bm25_by_id.get(chunk.id, 0.0)
+        relevance = bm25_by_id.get(chunk.id, 0.0) or neighbor_boost.get(chunk.file_path, 0.0)
         structural = centrality.get(chunk.file_path, 0.0)
         type_coverage = 0.5 if chunk.symbol_kind in _TYPE_LIKE else 0.0
 
