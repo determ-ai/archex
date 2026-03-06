@@ -32,27 +32,29 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # Keywords indicating data-store interaction in hover content.
-_DATASTORE_INDICATORS = frozenset({
-    "session",
-    "connection",
-    "cursor",
-    "transaction",
-    "engine",
-    "sessionmaker",
-    "asyncsession",
-    "pool",
-    "database",
-    "db",
-    "repository",
-    "collection",
-    "table",
-    "query",
-    "sqlalchemy",
-    "asyncpg",
-    "psycopg",
-    "pymongo",
-    "redis",
-})
+_DATASTORE_INDICATORS = frozenset(
+    {
+        "session",
+        "connection",
+        "cursor",
+        "transaction",
+        "engine",
+        "sessionmaker",
+        "asyncsession",
+        "pool",
+        "database",
+        "db",
+        "repository",
+        "collection",
+        "table",
+        "query",
+        "sqlalchemy",
+        "asyncpg",
+        "psycopg",
+        "pymongo",
+        "redis",
+    }
+)
 
 
 class LSAPEnrichedLookup:
@@ -68,9 +70,7 @@ class LSAPEnrichedLookup:
             raise LSAPError("Install lsp-client: uv add archex[lsap]")
         self._client: Any = lsp_client
 
-    async def get_hover(
-        self, file_path: str, line: int, character: int = 0
-    ) -> HoverInfo:
+    async def get_hover(self, file_path: str, line: int, character: int = 0) -> HoverInfo:
         """Return hover information for a position."""
         result = await self._client.request_hover(file_path, line, character)
         if result is None:

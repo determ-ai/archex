@@ -56,28 +56,34 @@ def _make_symbol(
 
 def _mock_client() -> AsyncMock:
     client = AsyncMock()
-    client.request_hover = AsyncMock(return_value={
-        "contents": "def get_user(self, user_id: int) -> User\nFetch a user by ID.",
-    })
-    client.request_references = AsyncMock(return_value=[
-        {
-            "uri": "src/service.py",
-            "range": {"start": {"line": 5, "character": 8}},
-            "context": "repo.get_user(42)",
-        },
-        {
-            "uri": "src/handler.py",
-            "range": {"start": {"line": 12, "character": 4}},
-            "context": "self.repo.get_user(uid)",
-        },
-    ])
-    client.request_definition = AsyncMock(return_value=[
-        {
-            "uri": "src/repo.py",
-            "range": {"start": {"line": 10, "character": 4}},
-            "context": "def get_user(self, user_id: int) -> User:",
-        },
-    ])
+    client.request_hover = AsyncMock(
+        return_value={
+            "contents": "def get_user(self, user_id: int) -> User\nFetch a user by ID.",
+        }
+    )
+    client.request_references = AsyncMock(
+        return_value=[
+            {
+                "uri": "src/service.py",
+                "range": {"start": {"line": 5, "character": 8}},
+                "context": "repo.get_user(42)",
+            },
+            {
+                "uri": "src/handler.py",
+                "range": {"start": {"line": 12, "character": 4}},
+                "context": "self.repo.get_user(uid)",
+            },
+        ]
+    )
+    client.request_definition = AsyncMock(
+        return_value=[
+            {
+                "uri": "src/repo.py",
+                "range": {"start": {"line": 10, "character": 4}},
+                "context": "def get_user(self, user_id: int) -> User:",
+            },
+        ]
+    )
     return client
 
 
@@ -96,9 +102,7 @@ class TestHoverEnrichment:
 
         client = _mock_client()
         lookup = LSAPEnrichedLookup(lsp_client=client)
-        hover = asyncio.get_event_loop().run_until_complete(
-            lookup.get_hover("src/repo.py", 10)
-        )
+        hover = asyncio.get_event_loop().run_until_complete(lookup.get_hover("src/repo.py", 10))
         assert isinstance(hover, HoverInfo)
         assert "get_user" in hover.type_signature
         assert hover.documentation == "Fetch a user by ID."
@@ -110,9 +114,7 @@ class TestHoverEnrichment:
         client = _mock_client()
         client.request_hover = AsyncMock(return_value=None)
         lookup = LSAPEnrichedLookup(lsp_client=client)
-        hover = asyncio.get_event_loop().run_until_complete(
-            lookup.get_hover("src/repo.py", 10)
-        )
+        hover = asyncio.get_event_loop().run_until_complete(lookup.get_hover("src/repo.py", 10))
         assert hover.type_signature == ""
         assert hover.raw_content == ""
 
@@ -123,9 +125,7 @@ class TestReferences:
 
         client = _mock_client()
         lookup = LSAPEnrichedLookup(lsp_client=client)
-        refs = asyncio.get_event_loop().run_until_complete(
-            lookup.get_references("src/repo.py", 10)
-        )
+        refs = asyncio.get_event_loop().run_until_complete(lookup.get_references("src/repo.py", 10))
         assert len(refs) == 2
         assert all(isinstance(r, ReferenceLocation) for r in refs)
         assert refs[0].file_path == "src/service.py"
@@ -138,9 +138,7 @@ class TestReferences:
         client = _mock_client()
         client.request_references = AsyncMock(return_value=None)
         lookup = LSAPEnrichedLookup(lsp_client=client)
-        refs = asyncio.get_event_loop().run_until_complete(
-            lookup.get_references("src/repo.py", 10)
-        )
+        refs = asyncio.get_event_loop().run_until_complete(lookup.get_references("src/repo.py", 10))
         assert refs == []
 
 
@@ -150,9 +148,7 @@ class TestDefinition:
 
         client = _mock_client()
         lookup = LSAPEnrichedLookup(lsp_client=client)
-        defn = asyncio.get_event_loop().run_until_complete(
-            lookup.get_definition("src/repo.py", 10)
-        )
+        defn = asyncio.get_event_loop().run_until_complete(lookup.get_definition("src/repo.py", 10))
         assert isinstance(defn, DefinitionLocation)
         assert defn.file_path == "src/repo.py"
         assert defn.line == 10
@@ -163,9 +159,7 @@ class TestDefinition:
         client = _mock_client()
         client.request_definition = AsyncMock(return_value=None)
         lookup = LSAPEnrichedLookup(lsp_client=client)
-        defn = asyncio.get_event_loop().run_until_complete(
-            lookup.get_definition("src/repo.py", 10)
-        )
+        defn = asyncio.get_event_loop().run_until_complete(lookup.get_definition("src/repo.py", 10))
         assert defn is None
 
 
@@ -176,9 +170,7 @@ class TestEnrichSymbol:
         client = _mock_client()
         lookup = LSAPEnrichedLookup(lsp_client=client)
         symbol = _make_symbol()
-        enriched = asyncio.get_event_loop().run_until_complete(
-            lookup.enrich_symbol(symbol)
-        )
+        enriched = asyncio.get_event_loop().run_until_complete(lookup.enrich_symbol(symbol))
         assert enriched.lsap_enrichment is not None
         enr = enriched.lsap_enrichment
         assert enr.hover is not None
@@ -197,9 +189,7 @@ class TestEnrichSymbol:
         client.request_hover = AsyncMock(side_effect=RuntimeError("server error"))
         lookup = LSAPEnrichedLookup(lsp_client=client)
         symbol = _make_symbol()
-        enriched = asyncio.get_event_loop().run_until_complete(
-            lookup.enrich_symbol(symbol)
-        )
+        enriched = asyncio.get_event_loop().run_until_complete(lookup.enrich_symbol(symbol))
         assert enriched.lsap_enrichment is not None
         enr = enriched.lsap_enrichment
         assert enr.hover is None  # failed
@@ -270,9 +260,11 @@ class TestPatternVerifier:
 
         client = _mock_client()
         # Hover returns content containing "session" — a datastore indicator.
-        client.request_hover = AsyncMock(return_value={
-            "contents": "def get_user(self, session: AsyncSession) -> User",
-        })
+        client.request_hover = AsyncMock(
+            return_value={
+                "contents": "def get_user(self, session: AsyncSession) -> User",
+            }
+        )
         lookup = LSAPEnrichedLookup(lsp_client=client)
         pattern = self._make_repository_pattern()
         parsed_files = [self._make_parsed_file()]
@@ -288,9 +280,11 @@ class TestPatternVerifier:
 
         client = _mock_client()
         # Hover returns content with no datastore indicators.
-        client.request_hover = AsyncMock(return_value={
-            "contents": "def get_user(self, user_id: int) -> UserDTO",
-        })
+        client.request_hover = AsyncMock(
+            return_value={
+                "contents": "def get_user(self, user_id: int) -> UserDTO",
+            }
+        )
         lookup = LSAPEnrichedLookup(lsp_client=client)
         pattern = self._make_repository_pattern()
         parsed_files = [self._make_parsed_file()]

@@ -26,12 +26,50 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
 
 _DROP_FTS_ROWS = "DELETE FROM chunks_fts;"
 
-_STOPWORDS = frozenset({
-    "a", "an", "and", "are", "as", "at", "be", "by", "do", "does", "for",
-    "from", "has", "have", "how", "i", "if", "in", "is", "it", "its", "of",
-    "on", "or", "so", "that", "the", "this", "to", "was", "we", "what",
-    "when", "where", "which", "who", "why", "will", "with", "you",
-})
+_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "and",
+        "are",
+        "as",
+        "at",
+        "be",
+        "by",
+        "do",
+        "does",
+        "for",
+        "from",
+        "has",
+        "have",
+        "how",
+        "i",
+        "if",
+        "in",
+        "is",
+        "it",
+        "its",
+        "of",
+        "on",
+        "or",
+        "so",
+        "that",
+        "the",
+        "this",
+        "to",
+        "was",
+        "we",
+        "what",
+        "when",
+        "where",
+        "which",
+        "who",
+        "why",
+        "will",
+        "with",
+        "you",
+    }
+)
 
 _GRADUATED_THRESHOLD = 10
 
@@ -82,7 +120,9 @@ class BM25Index:
         conn.commit()
 
     def _execute_fts(
-        self, escaped: str, top_k: int,
+        self,
+        escaped: str,
+        top_k: int,
     ) -> list[tuple[str, float]]:
         """Run a single FTS5 MATCH query, returning (chunk_id, score) pairs."""
         conn = self._store.conn
@@ -98,7 +138,9 @@ class BM25Index:
         return [(str(row[0]), float(row[1])) for row in cur.fetchall()]
 
     def _graduated_search(
-        self, tokens: list[str], top_k: int,
+        self,
+        tokens: list[str],
+        top_k: int,
     ) -> list[tuple[str, float]]:
         """Graduated fallback: AND-all → AND-subsets → OR-all.
 

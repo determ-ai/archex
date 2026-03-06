@@ -319,20 +319,63 @@ def _compute_top_k(total_chunks: int) -> int:
     return 150
 
 
-_PATH_NOISE = frozenset({
-    "how", "does", "implement", "what", "handle", "manage", "function",
-    "method", "class", "module", "file", "code", "work", "used", "using",
-    "create", "make", "define", "call", "return", "type", "data", "value",
-})
+_PATH_NOISE = frozenset(
+    {
+        "how",
+        "does",
+        "implement",
+        "what",
+        "handle",
+        "manage",
+        "function",
+        "method",
+        "class",
+        "module",
+        "file",
+        "code",
+        "work",
+        "used",
+        "using",
+        "create",
+        "make",
+        "define",
+        "call",
+        "return",
+        "type",
+        "data",
+        "value",
+    }
+)
 
 
 _STEM_SUFFIXES = ("ors", "ers", "ing", "tion", "ment", "ness", "ity", "ies", "ous")
 
-_SYMBOL_NOISE = _PATH_NOISE | frozenset({
-    "implement", "show", "find", "look", "search", "describe", "explain",
-    "this", "that", "with", "from", "into", "have", "been", "does",
-    "where", "which", "when", "will", "also", "each", "some",
-})
+_SYMBOL_NOISE = _PATH_NOISE | frozenset(
+    {
+        "implement",
+        "show",
+        "find",
+        "look",
+        "search",
+        "describe",
+        "explain",
+        "this",
+        "that",
+        "with",
+        "from",
+        "into",
+        "have",
+        "been",
+        "does",
+        "where",
+        "which",
+        "when",
+        "will",
+        "also",
+        "each",
+        "some",
+    }
+)
 
 
 def _extract_path_terms(question: str) -> list[str]:
@@ -346,11 +389,7 @@ def _extract_path_terms(question: str) -> list[str]:
     import re
 
     words = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{3,}", question)
-    raw = [
-        w.lower()
-        for w in words
-        if w.lower() not in _PATH_NOISE and len(w) >= 4
-    ]
+    raw = [w.lower() for w in words if w.lower() not in _PATH_NOISE and len(w) >= 4]
     seen: set[str] = set()
     terms: list[str] = []
     for t in raw:
@@ -415,11 +454,7 @@ def _symbol_search_seeds(
     import re
 
     words = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{2,}", question)
-    filtered = [
-        w.lower()
-        for w in words
-        if w.lower() not in _SYMBOL_NOISE and len(w) >= 3
-    ]
+    filtered = [w.lower() for w in words if w.lower() not in _SYMBOL_NOISE and len(w) >= 3]
     # Generate snake_case combinations of adjacent terms
     # e.g. "field validators" → "field_validator", "field_validators"
     bigrams: list[str] = []
@@ -655,7 +690,10 @@ def query(
                 vector_results: list[tuple[object, float]] | None = None
                 if index_config.vector:
                     vector_results = _two_stage_rerank(
-                        question, search_results, index_config, timing,
+                        question,
+                        search_results,
+                        index_config,
+                        timing,
                     )
 
                 if timing is not None:
@@ -766,7 +804,8 @@ def query(
             # Symbol seeds: add matched files as expansion seeds (low boost)
             all_existing_miss = bm25_ids | {c.id for c, _ in path_boost}
             symbol_seeds_miss = [
-                (c, s) for c, s in _symbol_search_seeds(store, question, max_bm25_score=max_bm25)
+                (c, s)
+                for c, s in _symbol_search_seeds(store, question, max_bm25_score=max_bm25)
                 if c.id not in all_existing_miss
             ]
             search_results = search_results + path_boost + symbol_seeds_miss
@@ -775,7 +814,10 @@ def query(
             vector_results_miss: list[tuple[object, float]] | None = None
             if index_config.vector:
                 vector_results_miss = _two_stage_rerank(
-                    question, search_results, index_config, timing,
+                    question,
+                    search_results,
+                    index_config,
+                    timing,
                 )
 
             if timing is not None:

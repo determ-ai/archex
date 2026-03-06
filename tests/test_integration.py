@@ -27,11 +27,13 @@ from archex.models import (
 def _has_tree_sitter_swift() -> bool:
     try:
         import tree_sitter_swift  # noqa: F401
+
         return True
     except ImportError:
         pass
     try:
         from tree_sitter_language_pack import get_language  # noqa: F401
+
         get_language("swift")
         return True
     except (ImportError, Exception):
@@ -957,9 +959,14 @@ class TestNewLanguageIntegration:
             ("java", "java_simple_repo"),
             ("kotlin", "kotlin_simple_repo"),
             ("csharp", "csharp_simple_repo"),
-            pytest.param("swift", "swift_simple_repo", marks=pytest.mark.skipif(
-                not _has_tree_sitter_swift(), reason="tree-sitter-swift not installed",
-            )),
+            pytest.param(
+                "swift",
+                "swift_simple_repo",
+                marks=pytest.mark.skipif(
+                    not _has_tree_sitter_swift(),
+                    reason="tree-sitter-swift not installed",
+                ),
+            ),
         ],
     )
     def test_analyze_new_language(
@@ -980,9 +987,15 @@ class TestNewLanguageIntegration:
             ("java", "java_simple_repo", "User"),
             ("kotlin", "kotlin_simple_repo", "User"),
             ("csharp", "csharp_simple_repo", "User"),
-            pytest.param("swift", "swift_simple_repo", "User", marks=pytest.mark.skipif(
-                not _has_tree_sitter_swift(), reason="tree-sitter-swift not installed",
-            )),
+            pytest.param(
+                "swift",
+                "swift_simple_repo",
+                "User",
+                marks=pytest.mark.skipif(
+                    not _has_tree_sitter_swift(),
+                    reason="tree-sitter-swift not installed",
+                ),
+            ),
         ],
     )
     def test_query_new_language(
@@ -1156,18 +1169,14 @@ class TestErrorPathIntegration:
             capture_output=True,
         )
         (tmp_path / ".gitkeep").touch()
-        subprocess.run(
-            ["git", "-C", str(tmp_path), "add", "."], check=True, capture_output=True
-        )
+        subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True, capture_output=True)
         subprocess.run(
             ["git", "-C", str(tmp_path), "commit", "-m", "init"],
             check=True,
             capture_output=True,
         )
         (tmp_path / ".gitkeep").unlink()
-        subprocess.run(
-            ["git", "-C", str(tmp_path), "add", "."], check=True, capture_output=True
-        )
+        subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True, capture_output=True)
         subprocess.run(
             ["git", "-C", str(tmp_path), "commit", "-m", "empty"],
             check=True,
@@ -1194,18 +1203,14 @@ class TestErrorPathIntegration:
             capture_output=True,
         )
         (tmp_path / ".gitkeep").touch()
-        subprocess.run(
-            ["git", "-C", str(tmp_path), "add", "."], check=True, capture_output=True
-        )
+        subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True, capture_output=True)
         subprocess.run(
             ["git", "-C", str(tmp_path), "commit", "-m", "init"],
             check=True,
             capture_output=True,
         )
         (tmp_path / ".gitkeep").unlink()
-        subprocess.run(
-            ["git", "-C", str(tmp_path), "add", "."], check=True, capture_output=True
-        )
+        subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True, capture_output=True)
         subprocess.run(
             ["git", "-C", str(tmp_path), "commit", "-m", "empty"],
             check=True,

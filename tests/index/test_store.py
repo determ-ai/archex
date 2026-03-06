@@ -742,5 +742,6 @@ class TestCorruptedDatabase:
         bad_db = tmp_path / "not_sqlite.db"
         bad_db.write_text("This is not a SQLite database")
         import sqlite3
+
         with pytest.raises(sqlite3.DatabaseError):
             IndexStore(bad_db)

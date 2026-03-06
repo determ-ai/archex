@@ -9,6 +9,7 @@ try:
 except ImportError:
     try:
         from tree_sitter_language_pack import get_language as _get_language
+
         _get_language("swift")
     except (ImportError, Exception):
         pytest.skip("tree-sitter-swift not available", allow_module_level=True)

@@ -136,13 +136,9 @@ def format_strategy_comparison(reports: list[BenchmarkReport]) -> str:
     for report in reports:
         lines.append(f"## {report.task_id}")
         lines.append("")
+        lines.append("| Strategy | Recall | Precision | F1 | MRR | nDCG | MAP | Tokens | Savings |")
         lines.append(
-            "| Strategy | Recall | Precision | F1 | MRR "
-            "| nDCG | MAP | Tokens | Savings |"
-        )
-        lines.append(
-            "|----------|--------|-----------|------|------"
-            "|------|------|--------|---------|"
+            "|----------|--------|-----------|------|------|------|------|--------|---------|"
         )
         for r in report.results:
             lines.append(
@@ -175,9 +171,7 @@ def format_strategy_comparison(reports: list[BenchmarkReport]) -> str:
     sep = " | ".join("------" for _ in metrics)
     lines.append(f"|----------|{sep}|-------|")
 
-    all_strategies = sorted(
-        {r.strategy.value for report in reports for r in report.results}
-    )
+    all_strategies = sorted({r.strategy.value for report in reports for r in report.results})
     for strategy in all_strategies:
         strat_wins = wins.get(strategy, {})
         counts = [str(strat_wins.get(m, 0)) for m in metrics]

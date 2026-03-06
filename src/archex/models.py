@@ -148,12 +148,7 @@ class ScoringWeights(BaseModel):
 
     @model_validator(mode="after")
     def _weights_sum_to_one(self) -> ScoringWeights:
-        if (
-            self.relevance < 0
-            or self.structural < 0
-            or self.type_coverage < 0
-            or self.cohesion < 0
-        ):
+        if self.relevance < 0 or self.structural < 0 or self.type_coverage < 0 or self.cohesion < 0:
             raise ValueError("Scoring weights must be non-negative")
         total = self.relevance + self.structural + self.type_coverage + self.cohesion
         if abs(total - 1.0) > 1e-6:

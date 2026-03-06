@@ -276,8 +276,7 @@ def _detect_event_bus(
             if methods & subscribe_names == {"on"}:
                 name_lower = cls.name.lower()
                 if not any(
-                    kw in name_lower
-                    for kw in ("event", "bus", "emitter", "dispatcher", "listener")
+                    kw in name_lower for kw in ("event", "bus", "emitter", "dispatcher", "listener")
                 ):
                     continue
 
@@ -340,8 +339,7 @@ def _detect_repository(
             crud_hits = methods & crud_names
 
             name_indicates_repo = any(
-                kw in cls.name.lower()
-                for kw in ("repo", "repository", "dao", "store", "data")
+                kw in cls.name.lower() for kw in ("repo", "repository", "dao", "store", "data")
             )
             if len(crud_hits) >= 3 or (len(crud_hits) >= 2 and name_indicates_repo):
                 evidence.append(

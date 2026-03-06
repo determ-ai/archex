@@ -82,9 +82,16 @@ def test_compare_baseline_detects_regression() -> None:
         ]
     )
     # Current results are worse
-    reports = [_make_report(
-        recall=0.5, precision=0.3, f1_score=0.37, mrr=0.2, ndcg=0.3, map_score=0.2,
-    )]
+    reports = [
+        _make_report(
+            recall=0.5,
+            precision=0.3,
+            f1_score=0.37,
+            mrr=0.2,
+            ndcg=0.3,
+            map_score=0.2,
+        )
+    ]
     comparisons = compare_baseline(reports, baseline)
     regressions = [c for c in comparisons if c.regression]
     assert len(regressions) > 0
@@ -110,9 +117,16 @@ def test_compare_baseline_no_regression() -> None:
         ]
     )
     # Current results are the same or better
-    reports = [_make_report(
-        recall=0.85, precision=0.65, f1_score=0.72, mrr=0.55, ndcg=0.75, map_score=0.65,
-    )]
+    reports = [
+        _make_report(
+            recall=0.85,
+            precision=0.65,
+            f1_score=0.72,
+            mrr=0.55,
+            ndcg=0.75,
+            map_score=0.65,
+        )
+    ]
     comparisons = compare_baseline(reports, baseline)
     regressions = [c for c in comparisons if c.regression]
     assert len(regressions) == 0

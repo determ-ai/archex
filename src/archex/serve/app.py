@@ -144,6 +144,7 @@ def create_app() -> FastAPI:
             return {"results": [], "message": "No benchmark results found"}
         try:
             from archex.benchmark.baseline import load_baseline
+
             data = json.loads(baseline_path.read_text())
             baseline = load_baseline(data)
             return {"results": [e.model_dump() for e in baseline.entries]}
@@ -158,6 +159,7 @@ def create_app() -> FastAPI:
             return {"summary": "No benchmark results found"}
         try:
             from archex.benchmark.baseline import load_baseline
+
             data = json.loads(baseline_path.read_text())
             baseline = load_baseline(data)
             if not baseline.entries:
@@ -179,6 +181,7 @@ def create_app() -> FastAPI:
             return {"passed": False, "reason": "No benchmark baseline found"}
         try:
             from archex.benchmark.baseline import load_baseline
+
             data = json.loads(baseline_path.read_text())
             baseline = load_baseline(data)
             if not baseline.entries:
@@ -206,6 +209,7 @@ def create_app() -> FastAPI:
     # --- Dashboard ---
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
+
         @app.get("/dashboard", response_class=HTMLResponse)
         def dashboard() -> HTMLResponse:
             index_html = static_dir / "index.html"

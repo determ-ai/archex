@@ -53,8 +53,7 @@ def passthrough_context(
     assembly_start = time.perf_counter()
     total_tokens = sum(_estimate_tokens(c) for c in all_chunks)
     included = [
-        RankedChunk(chunk=chunk, relevance_score=1.0, final_score=1.0)
-        for chunk in all_chunks
+        RankedChunk(chunk=chunk, relevance_score=1.0, final_score=1.0) for chunk in all_chunks
     ]
     included_files = sorted({c.file_path for c in all_chunks})
     file_tree = "\n".join(included_files)
@@ -101,10 +100,38 @@ def _query_terms(question: str) -> set[str]:
     import re
 
     stop = {
-        "how", "does", "implement", "what", "handle", "manage", "function",
-        "method", "class", "module", "file", "code", "work", "used", "using",
-        "create", "make", "define", "call", "return", "type", "data", "value",
-        "the", "and", "for", "with", "from", "this", "that", "show", "find",
+        "how",
+        "does",
+        "implement",
+        "what",
+        "handle",
+        "manage",
+        "function",
+        "method",
+        "class",
+        "module",
+        "file",
+        "code",
+        "work",
+        "used",
+        "using",
+        "create",
+        "make",
+        "define",
+        "call",
+        "return",
+        "type",
+        "data",
+        "value",
+        "the",
+        "and",
+        "for",
+        "with",
+        "from",
+        "this",
+        "that",
+        "show",
+        "find",
     }
     words = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{2,}", question)
     return {w.lower() for w in words if w.lower() not in stop}
@@ -178,7 +205,8 @@ def assemble_context(
                 path_match = any(t in path_lower for t in q_terms)
                 priority = seed_score * (1.5 if path_match else 1.0)
                 expansion_priority[dep] = max(
-                    expansion_priority.get(dep, 0.0), priority,
+                    expansion_priority.get(dep, 0.0),
+                    priority,
                 )
         # Importers get half seed score — they're consumers, not dependencies
         for imp in graph.imported_by(file_path):
@@ -187,10 +215,12 @@ def assemble_context(
                 path_match = any(t in path_lower for t in q_terms)
                 priority = seed_score * (0.75 if path_match else 0.5)
                 expansion_priority[imp] = max(
-                    expansion_priority.get(imp, 0.0), priority,
+                    expansion_priority.get(imp, 0.0),
+                    priority,
                 )
     sorted_expansion = sorted(
-        expansion_priority.keys(), key=lambda f: -expansion_priority[f],
+        expansion_priority.keys(),
+        key=lambda f: -expansion_priority[f],
     )
 
     # Build chunk lookup by file
@@ -260,13 +290,15 @@ def assemble_context(
                 path_match = any(t in path_lower for t in q_terms)
                 decay = IMPORT_TARGET_DECAY * (1.3 if path_match else 1.0)
                 neighbor_boost[dep] = max(
-                    neighbor_boost.get(dep, 0.0), seed_score * decay,
+                    neighbor_boost.get(dep, 0.0),
+                    seed_score * decay,
                 )
         # Importers get weaker boost — consumers, not dependencies
         for imp in graph.imported_by(file_path):
             if imp not in seed_files:
                 neighbor_boost[imp] = max(
-                    neighbor_boost.get(imp, 0.0), seed_score * IMPORTER_DECAY,
+                    neighbor_boost.get(imp, 0.0),
+                    seed_score * IMPORTER_DECAY,
                 )
 
     # Build RankedChunks
@@ -311,9 +343,7 @@ def assemble_context(
     for rc in ranked:
         fp = rc.chunk.file_path
         file_agg[fp] = file_agg.get(fp, 0.0) + rc.final_score
-    top_files = {
-        fp for fp, _ in sorted(file_agg.items(), key=lambda x: -x[1])[:MAX_FILES]
-    }
+    top_files = {fp for fp, _ in sorted(file_agg.items(), key=lambda x: -x[1])[:MAX_FILES]}
     ranked = [rc for rc in ranked if rc.chunk.file_path in top_files]
 
     # Greedy bin-packing within token budget with score cutoff

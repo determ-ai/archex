@@ -31,9 +31,7 @@ def fixture_task(python_simple_repo: Path) -> tuple[BenchmarkTask, Path]:
 class TestBenchmarkEndToEnd:
     """Run benchmark with fixture-based tasks end-to-end."""
 
-    def test_run_benchmark_produces_report(
-        self, fixture_task: tuple[BenchmarkTask, Path]
-    ) -> None:
+    def test_run_benchmark_produces_report(self, fixture_task: tuple[BenchmarkTask, Path]) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
             task,
@@ -43,9 +41,7 @@ class TestBenchmarkEndToEnd:
         assert isinstance(report, BenchmarkReport)
         assert len(report.results) > 0
 
-    def test_run_benchmark_raw_files(
-        self, fixture_task: tuple[BenchmarkTask, Path]
-    ) -> None:
+    def test_run_benchmark_raw_files(self, fixture_task: tuple[BenchmarkTask, Path]) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
             task,
@@ -95,9 +91,7 @@ class TestBenchmarkEndToEnd:
         assert isinstance(summary, str)
         assert len(summary) > 0
 
-    def test_check_gate_with_real_results(
-        self, fixture_task: tuple[BenchmarkTask, Path]
-    ) -> None:
+    def test_check_gate_with_real_results(self, fixture_task: tuple[BenchmarkTask, Path]) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
             task,
@@ -109,9 +103,7 @@ class TestBenchmarkEndToEnd:
         for v in violations:
             assert isinstance(v, GateViolation)
 
-    def test_baseline_roundtrip(
-        self, fixture_task: tuple[BenchmarkTask, Path]
-    ) -> None:
+    def test_baseline_roundtrip(self, fixture_task: tuple[BenchmarkTask, Path]) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
             task,
@@ -127,9 +119,7 @@ class TestBenchmarkEndToEnd:
         assert isinstance(loaded, Baseline)
         assert len(loaded.entries) == len(baseline.entries)
 
-    def test_compare_baseline_no_regression(
-        self, fixture_task: tuple[BenchmarkTask, Path]
-    ) -> None:
+    def test_compare_baseline_no_regression(self, fixture_task: tuple[BenchmarkTask, Path]) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
             task,
@@ -142,9 +132,7 @@ class TestBenchmarkEndToEnd:
         regressions = [c for c in comparisons if c.regression]
         assert regressions == []
 
-    def test_task_id_preserved_in_report(
-        self, fixture_task: tuple[BenchmarkTask, Path]
-    ) -> None:
+    def test_task_id_preserved_in_report(self, fixture_task: tuple[BenchmarkTask, Path]) -> None:
         task, repo_path = fixture_task
         report = run_benchmark(
             task,

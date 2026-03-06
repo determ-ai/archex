@@ -15,6 +15,7 @@ from archex.index.embeddings.base import Embedder
 def _torch_available() -> bool:
     try:
         import torch  # noqa: F401
+
         return True
     except (ImportError, RuntimeError):
         return False

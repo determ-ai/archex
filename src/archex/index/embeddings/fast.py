@@ -41,8 +41,7 @@ class FastEmbedder:
             from fastembed import TextEmbedding  # pyright: ignore[reportMissingImports]
         except ImportError as e:
             raise ArchexIndexError(
-                "FastEmbedder requires fastembed. "
-                "Install with: uv add 'archex[vector-fast]'"
+                "FastEmbedder requires fastembed. Install with: uv add 'archex[vector-fast]'"
             ) from e
 
         self._model = TextEmbedding(model_name=self._model_name)

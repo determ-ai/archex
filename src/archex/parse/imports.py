@@ -166,7 +166,7 @@ def build_file_map(files: list[DiscoveredFile]) -> dict[str, str]:
         # Also register with source-directory prefix stripped
         for prefix in _SOURCE_PREFIXES:
             if normalized.startswith(prefix):
-                stripped = normalized[len(prefix):]
+                stripped = normalized[len(prefix) :]
                 if stripped.endswith("/__init__.py"):
                     stripped_key = stripped[: -len("/__init__.py")].replace("/", ".")
                 elif stripped.endswith(".py"):

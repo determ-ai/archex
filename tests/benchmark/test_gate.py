@@ -47,9 +47,16 @@ def test_check_gate_all_pass() -> None:
 
 
 def test_check_gate_violation_detected() -> None:
-    reports = [_make_report(
-        recall=0.1, precision=0.05, f1_score=0.05, mrr=0.0, ndcg=0.0, map_score=0.0,
-    )]
+    reports = [
+        _make_report(
+            recall=0.1,
+            precision=0.05,
+            f1_score=0.05,
+            mrr=0.0,
+            ndcg=0.0,
+            map_score=0.0,
+        )
+    ]
     violations = check_gate(reports)
     assert len(violations) > 0
     violated_metrics = {v.metric for v in violations}
@@ -59,12 +66,24 @@ def test_check_gate_violation_detected() -> None:
 
 
 def test_check_gate_custom_thresholds() -> None:
-    reports = [_make_report(
-        recall=0.5, precision=0.4, f1_score=0.4, mrr=0.3, ndcg=0.4, map_score=0.4,
-    )]
+    reports = [
+        _make_report(
+            recall=0.5,
+            precision=0.4,
+            f1_score=0.4,
+            mrr=0.3,
+            ndcg=0.4,
+            map_score=0.4,
+        )
+    ]
     # With lower thresholds, should pass
     thresholds = QualityThresholds(
-        min_recall=0.4, min_precision=0.3, min_f1=0.3, min_mrr=0.2, min_ndcg=0.3, min_map=0.3,
+        min_recall=0.4,
+        min_precision=0.3,
+        min_f1=0.3,
+        min_mrr=0.2,
+        min_ndcg=0.3,
+        min_map=0.3,
     )
     violations = check_gate(reports, thresholds)
     assert violations == []

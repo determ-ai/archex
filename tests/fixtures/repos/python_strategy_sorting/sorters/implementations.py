@@ -31,7 +31,12 @@ class MergeSort(SortStrategy):
         return self._merge(left, right, key=key, reverse=reverse)
 
     def _merge(
-        self, left: list[T], right: list[T], *, key: callable | None, reverse: bool,
+        self,
+        left: list[T],
+        right: list[T],
+        *,
+        key: callable | None,
+        reverse: bool,
     ) -> list[T]:
         result: list[T] = []
         i = j = 0

@@ -23,29 +23,38 @@ class TestHealthEndpoint:
 
 class TestAnalyzeEndpoint:
     def test_analyze_with_valid_source(self, client: TestClient, python_simple_repo) -> None:
-        response = client.post("/analyze", json={
-            "source": {"local_path": str(python_simple_repo)},
-            "config": {"cache": False},
-        })
+        response = client.post(
+            "/analyze",
+            json={
+                "source": {"local_path": str(python_simple_repo)},
+                "config": {"cache": False},
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "repo" in data
         assert "stats" in data
 
     def test_analyze_invalid_source_returns_422(self, client: TestClient) -> None:
-        response = client.post("/analyze", json={
-            "source": {},
-        })
+        response = client.post(
+            "/analyze",
+            json={
+                "source": {},
+            },
+        )
         assert response.status_code == 422
 
 
 class TestQueryEndpoint:
     def test_query_with_valid_source(self, client: TestClient, python_simple_repo) -> None:
-        response = client.post("/query", json={
-            "source": {"local_path": str(python_simple_repo)},
-            "question": "How does authentication work?",
-            "config": {"cache": False},
-        })
+        response = client.post(
+            "/query",
+            json={
+                "source": {"local_path": str(python_simple_repo)},
+                "question": "How does authentication work?",
+                "config": {"cache": False},
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "query" in data
@@ -54,9 +63,12 @@ class TestQueryEndpoint:
 
 class TestTreeEndpoint:
     def test_tree_returns_valid_data(self, client: TestClient, python_simple_repo) -> None:
-        response = client.get("/tree", params={
-            "local_path": str(python_simple_repo),
-        })
+        response = client.get(
+            "/tree",
+            params={
+                "local_path": str(python_simple_repo),
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert "entries" in data
@@ -87,8 +99,11 @@ class TestDashboard:
 
 class TestErrorHandling:
     def test_nonexistent_repo_returns_error(self, client: TestClient) -> None:
-        response = client.post("/analyze", json={
-            "source": {"local_path": "/nonexistent/path/to/repo"},
-            "config": {"cache": False},
-        })
+        response = client.post(
+            "/analyze",
+            json={
+                "source": {"local_path": "/nonexistent/path/to/repo"},
+                "config": {"cache": False},
+            },
+        )
         assert response.status_code in (404, 500)

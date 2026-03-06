@@ -549,37 +549,55 @@ class TestScoringWeightsValidation:
 
     def test_weights_sum_exactly_one(self) -> None:
         weights = ScoringWeights(
-            relevance=0.5, structural=0.3, type_coverage=0.2, cohesion=0.0,
+            relevance=0.5,
+            structural=0.3,
+            type_coverage=0.2,
+            cohesion=0.0,
         )
         assert weights.relevance == 0.5
 
     def test_weights_within_tolerance(self) -> None:
         # 1e-7 off should pass (within 1e-6 tolerance)
         weights = ScoringWeights(
-            relevance=0.6000001, structural=0.2, type_coverage=0.1, cohesion=0.1,
+            relevance=0.6000001,
+            structural=0.2,
+            type_coverage=0.1,
+            cohesion=0.1,
         )
         assert weights is not None
 
     def test_weights_outside_tolerance_raises(self) -> None:
         with pytest.raises(ValueError, match="must sum to 1.0"):
             ScoringWeights(
-                relevance=0.6001, structural=0.3, type_coverage=0.1, cohesion=0.0,
+                relevance=0.6001,
+                structural=0.3,
+                type_coverage=0.1,
+                cohesion=0.0,
             )
 
     def test_negative_weight_raises(self) -> None:
         with pytest.raises(ValueError, match="must be non-negative"):
             ScoringWeights(
-                relevance=-0.1, structural=0.8, type_coverage=0.3, cohesion=0.0,
+                relevance=-0.1,
+                structural=0.8,
+                type_coverage=0.3,
+                cohesion=0.0,
             )
 
     def test_all_zero_raises(self) -> None:
         with pytest.raises(ValueError, match="must sum to 1.0"):
             ScoringWeights(
-                relevance=0.0, structural=0.0, type_coverage=0.0, cohesion=0.0,
+                relevance=0.0,
+                structural=0.0,
+                type_coverage=0.0,
+                cohesion=0.0,
             )
 
     def test_cohesion_weight_included(self) -> None:
         weights = ScoringWeights(
-            relevance=0.4, structural=0.2, type_coverage=0.1, cohesion=0.3,
+            relevance=0.4,
+            structural=0.2,
+            type_coverage=0.1,
+            cohesion=0.3,
         )
         assert weights.cohesion == 0.3

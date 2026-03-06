@@ -392,7 +392,9 @@ class IndexStore:
         return int(row[0])
 
     def search_chunks_by_path_keyword(
-        self, keyword: str, limit: int = 50,
+        self,
+        keyword: str,
+        limit: int = 50,
     ) -> list[CodeChunk]:
         """Find chunks whose file_path contains keyword as exact substring (case-insensitive)."""
         cur = self._conn.execute(

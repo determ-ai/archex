@@ -305,7 +305,12 @@ def test_cohesion_signal_boosts_co_module_files() -> None:
     )
     results = [(c_a, 1.0), (c_b, 0.5)]
     bundle = assemble_context(
-        results, graph, [c_a, c_b], "q", token_budget=1000, modules=[mod],
+        results,
+        graph,
+        [c_a, c_b],
+        "q",
+        token_budget=1000,
+        modules=[mod],
     )
     for rc in bundle.chunks:
         assert rc.cohesion_score > 0.0
@@ -330,7 +335,12 @@ def test_cohesion_signal_zero_for_low_cohesion_module() -> None:
     mod = Module(name="low", root_path=".", files=["a.py"], cohesion_score=0.0)
     results = [(chunk, 1.0)]
     bundle = assemble_context(
-        results, graph, [chunk], "q", token_budget=1000, modules=[mod],
+        results,
+        graph,
+        [chunk],
+        "q",
+        token_budget=1000,
+        modules=[mod],
     )
     for rc in bundle.chunks:
         assert rc.cohesion_score == 0.0
@@ -346,8 +356,12 @@ def test_signal_agreement_computed_with_vector() -> None:
     bm25_results = [(c_a, 1.0)]
     vec_results = [(c_a, 0.9), (c_b, 0.5)]
     bundle = assemble_context(
-        bm25_results, graph, [c_a, c_b], "q",
-        token_budget=1000, vector_results=vec_results,
+        bm25_results,
+        graph,
+        [c_a, c_b],
+        "q",
+        token_budget=1000,
+        vector_results=vec_results,
     )
     assert bundle.retrieval_metadata.signal_agreement is not None
     assert 0.0 <= bundle.retrieval_metadata.signal_agreement <= 1.0
