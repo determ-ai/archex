@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from archex.api import (  # pyright: ignore[reportPrivateUsage]
-    _compute_top_k,
+from archex.api import (
+    _compute_top_k,  # pyright: ignore[reportPrivateUsage]
     analyze,
     compare,
     query,
