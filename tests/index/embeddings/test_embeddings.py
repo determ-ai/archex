@@ -90,9 +90,11 @@ class TestNomicCodeEmbedder:
         from archex.index.embeddings.nomic import NomicCodeEmbedder
 
         embedder = NomicCodeEmbedder()
-        with patch("builtins.__import__", side_effect=mock_import):
-            with pytest.raises(ArchexIndexError, match="sentence-transformers"):
-                embedder._load_model()  # pyright: ignore[reportPrivateUsage]
+        with (
+            patch("builtins.__import__", side_effect=mock_import),
+            pytest.raises(ArchexIndexError, match="sentence-transformers"),
+        ):
+            embedder._load_model()  # pyright: ignore[reportPrivateUsage]
 
     def test_load_model_success(self) -> None:
         """_load_model succeeds with sentence-transformers mocked."""
@@ -235,9 +237,11 @@ class TestFastEmbedder:
         from archex.index.embeddings.fast import FastEmbedder
 
         embedder = FastEmbedder()
-        with patch("builtins.__import__", side_effect=mock_import):
-            with pytest.raises(ArchexIndexError, match="fastembed"):
-                embedder._load_model()  # pyright: ignore[reportPrivateUsage]
+        with (
+            patch("builtins.__import__", side_effect=mock_import),
+            pytest.raises(ArchexIndexError, match="fastembed"),
+        ):
+            embedder._load_model()  # pyright: ignore[reportPrivateUsage]
 
     def test_load_model_success(self) -> None:
         """_load_model succeeds with fastembed mocked."""

@@ -100,14 +100,14 @@ def _query_terms(question: str) -> set[str]:
     """Extract lowercased content words from a query for expansion prioritization."""
     import re
 
-    _STOP = {
+    stop = {
         "how", "does", "implement", "what", "handle", "manage", "function",
         "method", "class", "module", "file", "code", "work", "used", "using",
         "create", "make", "define", "call", "return", "type", "data", "value",
         "the", "and", "for", "with", "from", "this", "that", "show", "find",
     }
     words = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{2,}", question)
-    return {w.lower() for w in words if w.lower() not in _STOP}
+    return {w.lower() for w in words if w.lower() not in stop}
 
 
 def assemble_context(

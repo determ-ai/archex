@@ -645,7 +645,8 @@ def query(
                 # Symbol seeds: add matched files as expansion seeds (low boost)
                 all_existing = bm25_ids | {c.id for c, _ in path_boost}
                 symbol_seeds = [
-                    (c, s) for c, s in _symbol_search_seeds(store, question, max_bm25_score=max_bm25)
+                    (c, s)
+                    for c, s in _symbol_search_seeds(store, question, max_bm25_score=max_bm25)
                     if c.id not in all_existing
                 ]
                 search_results = search_results + path_boost + symbol_seeds
