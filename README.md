@@ -257,15 +257,15 @@ agent_context = bundle.to_prompt(format="xml")
 
 When an agent encounters a new codebase, it has two options: explore file-by-file (expensive, slow, high risk of missing context) or receive a pre-computed structural map (cheap, fast, complete). archex is the pre-computed map.
 
-| Capability                        | archex                                        | archex + LSAP                                  | Claude Code                        | LSP                          |
-| --------------------------------- | --------------------------------------------- | ---------------------------------------------- | ---------------------------------- | ---------------------------- |
-| Cold-start codebase understanding | **Yes** — pre-computed structural map         | **Yes** — structural + semantic                | Slow — sequential file exploration | No — requires active session |
-| Semantic type resolution          | No — syntactic (tree-sitter)                  | **Yes** — LSP hover, references, definitions   | Via LLM reasoning                  | **Yes** — compiler-grade     |
-| Token-budget context assembly     | **Yes** — ranked, packed, dependency-expanded | **Yes** — enriched with type context           | No — agent manually selects        | No — not designed for this   |
-| Cross-repo structural comparison  | **Yes** — 6 dimensions, no LLM                | **Yes**                                        | No                                 | No                           |
-| Real-time editing support         | No                                            | No                                             | No                                 | **Yes**                      |
-| Offline / CI-embeddable           | **Yes**                                       | Partially — needs running language server      | No                                 | Partially                    |
-| Works with any agent framework    | **Yes** — CLI, MCP, Python API                | **Yes** — async Python API                     | Claude-specific                    | Editor-specific              |
+| Capability                        | archex                                        | archex + LSAP                                | Claude Code                        | LSP                          |
+| --------------------------------- | --------------------------------------------- | -------------------------------------------- | ---------------------------------- | ---------------------------- |
+| Cold-start codebase understanding | **Yes** — pre-computed structural map         | **Yes** — structural + semantic              | Slow — sequential file exploration | No — requires active session |
+| Semantic type resolution          | No — syntactic (tree-sitter)                  | **Yes** — LSP hover, references, definitions | Via LLM reasoning                  | **Yes** — compiler-grade     |
+| Token-budget context assembly     | **Yes** — ranked, packed, dependency-expanded | **Yes** — enriched with type context         | No — agent manually selects        | No — not designed for this   |
+| Cross-repo structural comparison  | **Yes** — 6 dimensions, no LLM                | **Yes**                                      | No                                 | No                           |
+| Real-time editing support         | No                                            | No                                           | No                                 | **Yes**                      |
+| Offline / CI-embeddable           | **Yes**                                       | Partially — needs running language server    | No                                 | Partially                    |
+| Works with any agent framework    | **Yes** — CLI, MCP, Python API                | **Yes** — async Python API                   | Claude-specific                    | Editor-specific              |
 
 ### LSAP Enrichment (opt-in)
 
@@ -319,19 +319,19 @@ archex and an LSP MCP server can run as sibling tools, giving agents both struct
 
 `query()` retrieval quality measured against human-annotated expected files across 11 benchmark tasks (4 self-referential archex tasks + 7 external open-source repos). Token budget: 8,192. Strategy: BM25.
 
-| Task | Repository | Language | Recall | Precision | F1 | MRR |
-| ---- | ---------- | -------- | -----: | --------: | ---: | ---: |
-| httpx_pooling | encode/httpx | Python | 1.00 | 0.231 | 0.375 | 1.00 |
-| mini_redis_async | tokio-rs/mini-redis | Rust | 1.00 | 0.176 | 0.300 | 1.00 |
-| click_decorators | pallets/click | Python | 0.67 | 0.286 | 0.400 | 1.00 |
-| gin_routing | gin-gonic/gin | Go | 0.67 | 0.083 | 0.148 | 0.08 |
-| fastapi_dependency_injection | tiangolo/fastapi | Python | 0.33 | 0.143 | 0.200 | 1.00 |
-| express_middleware | expressjs/express | JS | 0.33 | 0.056 | 0.095 | 0.08 |
-| pydantic_validators | pydantic/pydantic | Python | 0.00 | 0.000 | 0.000 | 0.00 |
-| archex_adapter_registry | . (self) | Python | 0.67 | 0.067 | 0.121 | 1.00 |
-| archex_delta_indexing | . (self) | Python | 0.67 | 0.111 | 0.190 | 0.50 |
-| archex_pattern_detection | . (self) | Python | 0.50 | 0.053 | 0.095 | 0.20 |
-| archex_query_pipeline | . (self) | Python | 0.33 | 0.040 | 0.071 | 0.02 |
+| Task                         | Repository          | Language | Recall | Precision |    F1 |  MRR |
+| ---------------------------- | ------------------- | -------- | -----: | --------: | ----: | ---: |
+| httpx_pooling                | encode/httpx        | Python   |   1.00 |     0.231 | 0.375 | 1.00 |
+| mini_redis_async             | tokio-rs/mini-redis | Rust     |   1.00 |     0.176 | 0.300 | 1.00 |
+| click_decorators             | pallets/click       | Python   |   0.67 |     0.286 | 0.400 | 1.00 |
+| gin_routing                  | gin-gonic/gin       | Go       |   0.67 |     0.083 | 0.148 | 0.08 |
+| fastapi_dependency_injection | tiangolo/fastapi    | Python   |   0.33 |     0.143 | 0.200 | 1.00 |
+| express_middleware           | expressjs/express   | JS       |   0.33 |     0.056 | 0.095 | 0.08 |
+| pydantic_validators          | pydantic/pydantic   | Python   |   0.00 |     0.000 | 0.000 | 0.00 |
+| archex_adapter_registry      | . (self)            | Python   |   0.67 |     0.067 | 0.121 | 1.00 |
+| archex_delta_indexing        | . (self)            | Python   |   0.67 |     0.111 | 0.190 | 0.50 |
+| archex_pattern_detection     | . (self)            | Python   |   0.50 |     0.053 | 0.095 | 0.20 |
+| archex_query_pipeline        | . (self)            | Python   |   0.33 |     0.040 | 0.071 | 0.02 |
 
 **Median recall: 0.67. Median MRR: 0.50. Median F1: 0.148.**
 
