@@ -9,7 +9,9 @@ import pytest
 
 from archex.benchmark.models import BenchmarkTask, Strategy
 from archex.benchmark.strategies import (
+    _deduplicate_ranked,  # pyright: ignore[reportPrivateUsage]
     compute_map,
+    compute_mrr,
     compute_ndcg,
     compute_precision,
     compute_recall,
@@ -94,7 +96,7 @@ class TestComputeNdcg:
         assert compute_ndcg([], ["a.py"]) == 0.0
 
     def test_k_parameter(self) -> None:
-        ranked = ["x.py"] * 20 + ["a.py"]
+        ranked = [f"filler_{i}.py" for i in range(20)] + ["a.py"]
         expected = ["a.py"]
         # With k=10, "a.py" is beyond cutoff
         assert compute_ndcg(ranked, expected, k=10) == 0.0
@@ -126,6 +128,45 @@ class TestComputeMap:
 
     def test_empty_ranked(self) -> None:
         assert compute_map([], ["a.py"]) == 0.0
+
+
+class TestDeduplicateRanked:
+    def test_removes_duplicates_preserves_order(self) -> None:
+        assert _deduplicate_ranked(["a.py", "b.py", "a.py", "c.py"]) == [
+            "a.py",
+            "b.py",
+            "c.py",
+        ]
+
+    def test_empty_list(self) -> None:
+        assert _deduplicate_ranked([]) == []
+
+    def test_no_duplicates(self) -> None:
+        assert _deduplicate_ranked(["a.py", "b.py"]) == ["a.py", "b.py"]
+
+    def test_all_same(self) -> None:
+        assert _deduplicate_ranked(["a.py", "a.py", "a.py"]) == ["a.py"]
+
+
+class TestRankingMetricsDedup:
+    """Verify that ranking metrics deduplicate before scoring."""
+
+    def test_mrr_with_duplicates(self) -> None:
+        # Without dedup: "x.py" at pos 1, "a.py" at pos 2 → MRR = 0.5
+        # Same after dedup since no relevant dup before first hit
+        assert compute_mrr(["x.py", "a.py", "a.py"], ["a.py"]) == 0.5
+
+    def test_ndcg_not_inflated_by_duplicates(self) -> None:
+        # ["a.py", "a.py"] with expected=["a.py"] should score same as ["a.py"]
+        perfect = compute_ndcg(["a.py"], ["a.py"])
+        with_dup = compute_ndcg(["a.py", "a.py"], ["a.py"])
+        assert with_dup == perfect
+
+    def test_map_not_inflated_by_duplicates(self) -> None:
+        # ["a.py", "a.py", "b.py"] should score same as ["a.py", "b.py"]
+        clean = compute_map(["a.py", "b.py"], ["a.py", "b.py"])
+        with_dup = compute_map(["a.py", "a.py", "b.py"], ["a.py", "b.py"])
+        assert with_dup == clean
 
 
 class TestExtractKeywords:
