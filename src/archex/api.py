@@ -786,15 +786,42 @@ def query(
                 ]
                 search_results = search_results + path_boost + symbol_seeds
 
-                # Two-stage: rerank BM25 candidates with vector similarity
+                # Two-stage: use pre-computed vector index or fall back to rerank
                 vector_results: list[tuple[CodeChunk, float]] | None = None
                 if index_config.vector:
-                    vector_results = _two_stage_rerank(
-                        question,
-                        search_results,
-                        index_config,
-                        timing,
-                    )
+                    cached_npz = cache.vector_path(cache_key)
+                    if cached_npz.exists():
+                        embedder = _get_embedder(index_config)
+                        if embedder is not None:
+                            from archex.index.vector import VectorIndex
+
+                            t_vec_cached = time.perf_counter()
+                            cached_chunks = store.get_chunks()
+                            vec_idx_cached = VectorIndex()
+                            vec_idx_cached.load(
+                                cached_npz,
+                                cached_chunks,
+                                embedder_name=index_config.embedder or "",
+                                vector_dim=embedder.dimension,
+                            )
+                            vector_results = vec_idx_cached.search(
+                                question, embedder, top_k=top_k
+                            )
+                            if timing is not None:
+                                timing.vector_used = True
+                                timing.vector_build_ms = _elapsed_ms(t_vec_cached)
+                            logger.info(
+                                "Vector search (pre-computed cached, %d chunks) in %.0fms",
+                                vec_idx_cached.size,
+                                _elapsed_ms(t_vec_cached),
+                            )
+                    else:
+                        vector_results = _two_stage_rerank(
+                            question,
+                            search_results,
+                            index_config,
+                            timing,
+                        )
 
                 if timing is not None:
                     timing.search_ms = _elapsed_ms(t_search)
@@ -914,6 +941,35 @@ def query(
             edges = graph.file_edges()
             store.insert_edges(edges)
             bm25.build(all_chunks)
+
+            # Pre-compute vector embeddings at index time when vector mode is enabled
+            _precomputed_vector_path: Path | None = None
+            if index_config.vector:
+                embedder = _get_embedder(index_config)
+                if embedder is not None:
+                    from archex.index.vector import VectorIndex
+
+                    t_vec_build = time.perf_counter()
+                    vec_idx = VectorIndex()
+                    vec_idx.build(all_chunks, embedder)
+                    npz_path = (
+                        cache.vector_path(cache_key) if config.cache else store.vector_index_path
+                    )
+                    vec_idx.save(
+                        npz_path,
+                        embedder_name=index_config.embedder or "",
+                        vector_dim=embedder.dimension,
+                    )
+                    _precomputed_vector_path = npz_path
+                    vec_build_ms = _elapsed_ms(t_vec_build)
+                    if timing is not None:
+                        timing.vector_index_ms = vec_build_ms
+                    logger.info(
+                        "Pre-computed %d chunk embeddings at index time in %.0fms",
+                        len(all_chunks),
+                        vec_build_ms,
+                    )
+
             if timing is not None:
                 timing.index_ms = _elapsed_ms(t4)
             if trace is not None:
@@ -980,15 +1036,38 @@ def query(
             ]
             search_results = search_results + path_boost + symbol_seeds_miss
 
-            # Two-stage: rerank BM25 candidates with vector similarity
+            # Two-stage: use pre-computed vector index or fall back to rerank
             vector_results_miss: list[tuple[CodeChunk, float]] | None = None
             if index_config.vector:
-                vector_results_miss = _two_stage_rerank(
-                    question,
-                    search_results,
-                    index_config,
-                    timing,
-                )
+                if _precomputed_vector_path is not None and _precomputed_vector_path.exists():
+                    embedder = _get_embedder(index_config)
+                    if embedder is not None:
+                        from archex.index.vector import VectorIndex
+
+                        t_vec_q = time.perf_counter()
+                        vec_idx_q = VectorIndex()
+                        vec_idx_q.load(
+                            _precomputed_vector_path,
+                            all_chunks,
+                            embedder_name=index_config.embedder or "",
+                            vector_dim=embedder.dimension,
+                        )
+                        vector_results_miss = vec_idx_q.search(question, embedder, top_k=top_k)
+                        if timing is not None:
+                            timing.vector_used = True
+                            timing.vector_build_ms = _elapsed_ms(t_vec_q)
+                        logger.info(
+                            "Vector search (pre-computed, %d chunks) in %.0fms",
+                            vec_idx_q.size,
+                            _elapsed_ms(t_vec_q),
+                        )
+                else:
+                    vector_results_miss = _two_stage_rerank(
+                        question,
+                        search_results,
+                        index_config,
+                        timing,
+                    )
 
             if timing is not None:
                 timing.search_ms = _elapsed_ms(t6)
