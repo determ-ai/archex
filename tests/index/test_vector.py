@@ -3,17 +3,19 @@
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from archex.exceptions import ArchexIndexError
+from archex.index.store import IndexStore
 from archex.index.vector import VectorIndex, reciprocal_rank_fusion
 from archex.models import CodeChunk, SymbolKind
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    pass
 
 
 class FakeEmbedder:
@@ -380,3 +382,62 @@ class TestReciprocalRankFusion:
         ]
         merged = reciprocal_rank_fusion(bm25, vector)
         assert len(merged) == 4
+
+
+class TestVectorPersistenceRoundTrip:
+    """Tests for build → save → load → search round-trip via IndexStore.vector_index_path."""
+
+    def test_build_save_load_search_matches_original(
+        self, embedder: FakeEmbedder, tmp_path: Path
+    ) -> None:
+        """build → save → load → search produces the same results as build → search."""
+        idx = VectorIndex()
+        idx.build(SAMPLE_CHUNKS, embedder)
+        expected = idx.search("user authentication", embedder)
+
+        save_path = tmp_path / "vec.npz"
+        idx.save(save_path, embedder_name="fake", vector_dim=64)
+
+        loaded = VectorIndex()
+        loaded.load(save_path, SAMPLE_CHUNKS, embedder_name="fake", vector_dim=64)
+        actual = loaded.search("user authentication", embedder)
+
+        assert len(actual) == len(expected)
+        for (ec, es), (ac, as_) in zip(expected, actual, strict=True):
+            assert ec.id == ac.id
+            assert abs(es - as_) < 1e-5
+
+    def test_save_creates_npz_at_expected_path(
+        self, embedder: FakeEmbedder, tmp_path: Path
+    ) -> None:
+        """save() writes the .npz file to the specified path."""
+        save_path = tmp_path / "index.vectors.npz"
+        idx = VectorIndex()
+        idx.build(SAMPLE_CHUNKS[:2], embedder)
+        idx.save(save_path, embedder_name="fake", vector_dim=64)
+        assert save_path.exists()
+
+    def test_load_wrong_embedder_name_raises(
+        self, embedder: FakeEmbedder, tmp_path: Path
+    ) -> None:
+        """load raises ArchexIndexError when embedder_name doesn't match saved metadata."""
+        save_path = tmp_path / "vec.npz"
+        idx = VectorIndex()
+        idx.build([SAMPLE_CHUNKS[0]], embedder)
+        idx.save(save_path, embedder_name="model-x", vector_dim=64)
+
+        loader = VectorIndex()
+        with pytest.raises(ArchexIndexError, match="Embedder mismatch"):
+            loader.load(save_path, [SAMPLE_CHUNKS[0]], embedder_name="model-y", vector_dim=64)
+
+    def test_index_store_vector_index_path_returns_correct_path(
+        self, tmp_path: Path
+    ) -> None:
+        """IndexStore.vector_index_path is db_path with .vectors.npz suffix."""
+        db_path = tmp_path / "index.db"
+        store = IndexStore(db_path)
+        try:
+            expected = tmp_path / "index.vectors.npz"
+            assert store.vector_index_path == expected
+        finally:
+            store.close()
