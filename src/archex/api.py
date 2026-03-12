@@ -850,12 +850,16 @@ def query(
                         index_config,
                         top_k,
                     )
-                    _bm25_raw, path_boost, symbol_seeds = _bm25_search_with_boosts(
-                        bm25, store, question, top_k
-                    )
+                    if index_config.bm25:
+                        _bm25_raw, path_boost, symbol_seeds = _bm25_search_with_boosts(
+                            bm25, store, question, top_k
+                        )
+                        search_results = _bm25_raw + path_boost + symbol_seeds
+                    else:
+                        search_results = []
+                        path_boost = []
+                        symbol_seeds = []
                     vector_results: list[tuple[CodeChunk, float]] | None = _vec_future.result()
-
-                search_results = _bm25_raw + path_boost + symbol_seeds
 
                 # Fall back to rerank when pre-computed .npz is absent
                 if vector_results is None and index_config.vector:
@@ -1091,12 +1095,16 @@ def query(
                     index_config,
                     top_k,
                 )
-                _bm25_raw, path_boost, symbol_seeds_miss = _bm25_search_with_boosts(
-                    bm25, store, question, top_k
-                )
+                if index_config.bm25:
+                    _bm25_raw, path_boost, symbol_seeds_miss = _bm25_search_with_boosts(
+                        bm25, store, question, top_k
+                    )
+                    search_results = _bm25_raw + path_boost + symbol_seeds_miss
+                else:
+                    search_results = []
+                    path_boost = []
+                    symbol_seeds_miss = []
                 vector_results_miss: list[tuple[CodeChunk, float]] | None = _vec_future.result()
-
-            search_results = _bm25_raw + path_boost + symbol_seeds_miss
 
             # Fall back to rerank when pre-computed .npz is absent
             if vector_results_miss is None and index_config.vector:

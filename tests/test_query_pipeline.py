@@ -9,10 +9,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 from archex.api import query
 from archex.models import (
     Config,
     ContextBundle,
+    IndexConfig,
     PipelineTiming,
     RepoSource,
     ScoringWeights,
@@ -130,3 +133,43 @@ class TestRenderPipeline:
         assert root.tag == "context"
         chunks = root.findall(".//chunk")
         assert len(chunks) > 0
+
+
+class TestIndexConfigQueryPaths:
+    """Verify BM25-skip and pure-BM25 paths in query()."""
+
+    def test_pure_bm25_query_returns_results(self, python_simple_repo: Path) -> None:
+        source = RepoSource(local_path=str(python_simple_repo))
+        config = Config(cache=False)
+        index_config = IndexConfig(bm25=True, vector=False)
+        bundle = query(
+            source,
+            "User model and authentication",
+            config=config,
+            index_config=index_config,
+        )
+
+        assert isinstance(bundle, ContextBundle)
+        assert len(bundle.chunks) > 0
+
+    def test_bm25_false_vector_true_returns_bundle(self, python_simple_repo: Path) -> None:
+        """Pure vector path: bm25=False skips BM25 search; vector rerank feeds assemble_context."""
+        source = RepoSource(local_path=str(python_simple_repo))
+        config = Config(cache=False)
+        index_config = IndexConfig(bm25=False, vector=True)
+        bundle = query(
+            source,
+            "User model and authentication",
+            config=config,
+            index_config=index_config,
+        )
+
+        assert isinstance(bundle, ContextBundle)
+        # Vector rerank produces results from the chunk corpus
+        assert len(bundle.chunks) > 0
+
+    def test_bm25_false_vector_false_raises(self) -> None:
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="At least one of bm25 or vector must be enabled"):
+            IndexConfig(bm25=False, vector=False)

@@ -495,6 +495,25 @@ class TestIndexConfigValidation:
         config = IndexConfig(chunk_min_tokens=0)
         assert config.chunk_min_tokens == 0
 
+    def test_both_disabled_raises(self) -> None:
+        with pytest.raises(ValueError, match="At least one of bm25 or vector must be enabled"):
+            IndexConfig(bm25=False, vector=False)
+
+    def test_bm25_only_valid(self) -> None:
+        config = IndexConfig(bm25=True, vector=False)
+        assert config.bm25 is True
+        assert config.vector is False
+
+    def test_vector_only_valid(self) -> None:
+        config = IndexConfig(bm25=False, vector=True)
+        assert config.bm25 is False
+        assert config.vector is True
+
+    def test_both_enabled_valid(self) -> None:
+        config = IndexConfig(bm25=True, vector=True)
+        assert config.bm25 is True
+        assert config.vector is True
+
 
 # ---------------------------------------------------------------------------
 # RepoSource validation tests
