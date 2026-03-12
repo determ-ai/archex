@@ -1,5 +1,9 @@
 """Tests for query normalization (_query_terms) and symbol promotion (_symbol_search_seeds)."""
 
+# pyright: reportPrivateUsage=false, reportAttributeAccessIssue=false
+# pyright: reportUnknownVariableType=false, reportUnknownMemberType=false
+# pyright: reportUnknownArgumentType=false
+
 from __future__ import annotations
 
 import tempfile
