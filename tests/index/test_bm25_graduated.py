@@ -9,6 +9,8 @@ The graduated search has 4 stages:
 These tests create enough chunks to exercise each stage boundary.
 """
 
+# pyright: reportPrivateUsage=false
+# pyright: reportUnknownMemberType=false, reportUnknownArgumentType=false
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
