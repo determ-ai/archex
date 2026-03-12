@@ -57,7 +57,7 @@ class PipelineTrace:
 
     @property
     def total_ms(self) -> float:
-        if self.end_ns and self.start_ns:
+        if self.end_ns > 0:
             return (self.end_ns - self.start_ns) / 1_000_000
         return sum(s.duration_ms for s in self.steps)
 
