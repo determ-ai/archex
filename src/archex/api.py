@@ -1,4 +1,40 @@
-"""Top-level public API: analyze, query, and compare entry points."""
+"""Top-level public API: analyze, query, and compare entry points.
+
+Service roles and pipeline phases
+==================================
+
+Each public function orchestrates a sequence of distinct service roles:
+
+**Acquisition** — Resolve a RepoSource to a local path on disk.
+  Input:  RepoSource (url or local_path)
+  Output: (repo_path: Path, cleanup: Callable)
+  Module: archex.acquire
+
+**Parsing** — Discover files, extract symbols, resolve imports.
+  Input:  repo_path, Config
+  Output: ParseArtifacts (files, parsed_files, resolved_imports)
+  Module: archex.parse, archex.pipeline.service
+
+**Indexing** — Chunk code, build BM25/vector indices, persist to SQLite.
+  Input:  ParseArtifacts, IndexConfig
+  Output: IndexStore (open handle to chunk/edge/FTS5 database)
+  Module: archex.index
+
+**Retrieval** — Search the index, expand via dependency graph, score, assemble.
+  Input:  IndexStore, question, token_budget, ScoringWeights
+  Output: ContextBundle (ranked chunks within token budget)
+  Module: archex.serve.context
+
+**Analysis** — Detect modules, patterns, interfaces, decisions from parsed code.
+  Input:  ParsedFiles, DependencyGraph
+  Output: ArchProfile
+  Module: archex.analyze, archex.serve.profile
+
+**Observability** — Optional PipelineTrace records step-level timings.
+  Input:  PipelineTrace (optional)
+  Output: Trace populated with StepTiming records; logged at DEBUG level
+  Module: archex.observe
+"""
 
 from __future__ import annotations
 
@@ -60,7 +96,7 @@ if TYPE_CHECKING:
     from archex.models import ComparisonResult
 
 # ---------------------------------------------------------------------------
-# Shared helpers for Tier 1 precision tools
+# Acquisition + Indexing — shared helpers for all entry points
 # ---------------------------------------------------------------------------
 
 
@@ -72,7 +108,12 @@ def _full_index(
     timing: PipelineTiming | None,
     index_config: IndexConfig | None = None,
 ) -> IndexStore:
-    """Run the full acquire → parse → chunk → store pipeline."""
+    """Run the full acquire → parse → chunk → store pipeline.
+
+    Combines acquisition, parsing, and indexing phases into a single
+    IndexStore. Used when no cache hit is available and delta indexing
+    is not applicable.
+    """
     t_acq = time.perf_counter()
     repo_path, _url, _local_path, cleanup, cloned_head = _acquire(source)
     if timing is not None:
@@ -294,7 +335,14 @@ def _elapsed_ms(start: float) -> float:
 def _acquire(
     source: RepoSource,
 ) -> tuple[Path, str | None, str | None, Callable[[], None], str | None]:
-    """Resolve a RepoSource to a local path, returning a cleanup callable and cloned HEAD."""
+    """Acquisition phase: resolve a RepoSource to a local filesystem path.
+
+    Returns:
+        (repo_path, url, local_path, cleanup_fn, cloned_head_commit)
+
+    The cleanup_fn removes any temporary directory created for URL clones.
+    For local paths, cleanup_fn is a no-op.
+    """
     if source.url and (source.url.startswith("http://") or source.url.startswith("https://")):
         target_dir = tempfile.mkdtemp()
 
@@ -317,6 +365,11 @@ def _acquire(
 def _build_adapters() -> dict[str, LanguageAdapter]:
     """Build the registry of language adapters from the default registry."""
     return default_adapter_registry.build_all()
+
+
+# ---------------------------------------------------------------------------
+# Retrieval — search augmentation helpers (path boost, symbol seeds, reranking)
+# ---------------------------------------------------------------------------
 
 
 def _compute_top_k(total_chunks: int) -> int:
@@ -531,15 +584,25 @@ def _total_chunk_tokens(chunks: list[CodeChunk]) -> int:
     return sum(estimate_tokens(c) for c in chunks)
 
 
+# ---------------------------------------------------------------------------
+# Public entry points — orchestrate acquisition → indexing → retrieval/analysis
+# ---------------------------------------------------------------------------
+
+
 def analyze(
     source: RepoSource,
     config: Config | None = None,
     timing: PipelineTiming | None = None,
 ) -> ArchProfile:
-    """Acquire, parse, index, and analyze a repository.
+    """Acquire, parse, and analyze a repository, returning an ArchProfile.
 
-    Runs the full pipeline: acquire → parse → graph → modules → patterns → interfaces
-    → optional LLM enrichment → profile assembly.
+    Pipeline phases:
+      1. Acquisition — clone or open local repo
+      2. Parsing — discover files, extract symbols, resolve imports
+      3. Analysis — detect modules, patterns, interfaces, infer decisions
+      4. (Optional) LLM enrichment via configured provider
+
+    The optional ``timing`` parameter records per-phase millisecond breakdowns.
     """
     if config is None:
         config = Config()
@@ -1018,7 +1081,8 @@ def compare(
 ) -> ComparisonResult:
     """Analyze two repositories and return a ComparisonResult.
 
-    Uses ThreadPoolExecutor to run both analyses concurrently.
+    Runs two parallel ``analyze()`` pipelines (acquisition → parsing → analysis)
+    then delegates to ``compare_repos()`` for dimension-by-dimension comparison.
     """
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_a = executor.submit(analyze, source_a, config)

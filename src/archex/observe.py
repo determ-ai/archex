@@ -26,7 +26,7 @@ class StepTiming:
     name: str
     start_ns: int = 0
     end_ns: int = 0
-    metadata: dict[str, str | int | float | bool] = field(default_factory=dict)
+    metadata: dict[str, str | int | float | bool] = field(default_factory=lambda: {})
 
     @property
     def duration_ms(self) -> float:
@@ -50,10 +50,10 @@ class PipelineTrace:
     """
 
     operation: str
-    steps: list[StepTiming] = field(default_factory=list)
+    steps: list[StepTiming] = field(default_factory=lambda: [])
     start_ns: int = 0
     end_ns: int = 0
-    metadata: dict[str, str | int | float | bool] = field(default_factory=dict)
+    metadata: dict[str, str | int | float | bool] = field(default_factory=lambda: {})
 
     @property
     def total_ms(self) -> float:
