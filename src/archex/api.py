@@ -653,9 +653,7 @@ def query(
                 # Use persisted corpus stats — avoids full-chunk hydration
                 stored_tokens = store.get_metadata("repo_total_tokens")
                 total_repo_tokens = (
-                    int(stored_tokens)
-                    if stored_tokens is not None
-                    else store.get_total_tokens()
+                    int(stored_tokens) if stored_tokens is not None else store.get_total_tokens()
                 )
                 stored_count = store.get_metadata("chunk_count")
                 chunk_count = (
