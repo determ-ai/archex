@@ -31,9 +31,19 @@ class CacheManager:
     # ------------------------------------------------------------------
 
     def cache_key(self, source: RepoSource, *, head_override: str | None = None) -> str:
-        """Derive a stable SHA256 cache key from the source identity and git HEAD."""
+        """Derive a stable SHA256 cache key from the source identity and resolved ref.
+
+        For local repos: resolves HEAD via git rev-parse.
+        For remote URLs with explicit commit: uses the pinned commit.
+        For remote URLs without commit: resolves HEAD via git ls-remote.
+        """
         identity = source.url or source.local_path or ""
-        commit = source.commit or head_override or self.git_head(source.local_path)
+        commit = (
+            source.commit
+            or head_override
+            or self.git_head(source.local_path)
+            or (self.resolve_remote_head(source.url) if source.url else None)
+        )
         if commit:
             identity = f"{identity}@{commit}"
         return hashlib.sha256(identity.encode()).hexdigest()
@@ -56,6 +66,24 @@ class CacheManager:
             )
             if result.returncode == 0:
                 return result.stdout.strip()
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        return None
+
+    @staticmethod
+    def resolve_remote_head(url: str | None, ref: str = "HEAD") -> str | None:
+        """Resolve a remote ref to a commit hash via git ls-remote."""
+        if not url:
+            return None
+        try:
+            result = subprocess.run(
+                ["git", "ls-remote", url, ref],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                return result.stdout.strip().split()[0]
         except (subprocess.TimeoutExpired, OSError):
             pass
         return None
@@ -92,13 +120,53 @@ class CacheManager:
             return db
         return None
 
-    def put(self, key: str, source_db: Path) -> Path:
+    def put(
+        self,
+        key: str,
+        source_db: Path,
+        *,
+        resolved_commit: str | None = None,
+        source_identity: str | None = None,
+    ) -> Path:
         """Copy source_db into the cache and record metadata. Return cache path."""
+        import json
+
         dest = self.db_path(key)
         shutil.copy2(str(source_db), str(dest))
         meta = self.meta_path(key)
-        meta.write_text(str(time.time()))
+        meta_data = {
+            "created_at": str(time.time()),
+            "resolved_commit": resolved_commit or "",
+            "source_identity": source_identity or "",
+        }
+        meta.write_text(json.dumps(meta_data))
         return dest
+
+    def get_meta(self, key: str) -> dict[str, str]:
+        """Read cache metadata for a key. Returns empty dict if missing."""
+        import json
+
+        meta = self.meta_path(key)
+        if not meta.exists():
+            return {}
+        raw = meta.read_text().strip()
+        # Backward compat: old meta files contain bare timestamp
+        if raw and not raw.startswith("{"):
+            return {"created_at": raw}
+        try:
+            return json.loads(raw)  # type: ignore[no-any-return]
+        except (json.JSONDecodeError, ValueError):
+            return {}
+
+    def is_stale(self, key: str, max_age_hours: int = 24) -> bool:
+        """Check if a cache entry is older than max_age_hours."""
+        meta = self.get_meta(key)
+        created_str = meta.get("created_at", "0")
+        try:
+            created = float(created_str)
+        except ValueError:
+            return True
+        return (time.time() - created) > max_age_hours * 3600
 
     def invalidate(self, key: str) -> None:
         """Remove the cached entry for key."""
@@ -118,8 +186,8 @@ class CacheManager:
         entries: list[dict[str, str]] = []
         for db in sorted(self._cache_dir.glob("*.db")):
             key = db.stem
-            meta = self.meta_path(key)
-            created_at = meta.read_text().strip() if meta.exists() else "0"
+            meta_data = self.get_meta(key)
+            created_at = meta_data.get("created_at", "0")
             entries.append(
                 {
                     "key": key,
@@ -132,20 +200,12 @@ class CacheManager:
 
     def clean(self, max_age_hours: int = 24) -> int:
         """Remove entries older than max_age_hours. Return count removed."""
-        cutoff = time.time() - max_age_hours * 3600
         removed = 0
         for db in list(self._cache_dir.glob("*.db")):
             key = db.stem
-            meta = self.meta_path(key)
-            if meta.exists():
-                try:
-                    created = float(meta.read_text().strip())
-                except ValueError:
-                    created = 0.0
-            else:
-                created = db.stat().st_mtime
-            if created < cutoff:
+            if self.is_stale(key, max_age_hours):
                 db.unlink()
+                meta = self.meta_path(key)
                 if meta.exists():
                     meta.unlink()
                 removed += 1
