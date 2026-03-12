@@ -416,9 +416,7 @@ class TestVectorPersistenceRoundTrip:
         idx.save(save_path, embedder_name="fake", vector_dim=64)
         assert save_path.exists()
 
-    def test_load_wrong_embedder_name_raises(
-        self, embedder: FakeEmbedder, tmp_path: Path
-    ) -> None:
+    def test_load_wrong_embedder_name_raises(self, embedder: FakeEmbedder, tmp_path: Path) -> None:
         """load raises ArchexIndexError when embedder_name doesn't match saved metadata."""
         save_path = tmp_path / "vec.npz"
         idx = VectorIndex()
@@ -429,9 +427,7 @@ class TestVectorPersistenceRoundTrip:
         with pytest.raises(ArchexIndexError, match="Embedder mismatch"):
             loader.load(save_path, [SAMPLE_CHUNKS[0]], embedder_name="model-y", vector_dim=64)
 
-    def test_index_store_vector_index_path_returns_correct_path(
-        self, tmp_path: Path
-    ) -> None:
+    def test_index_store_vector_index_path_returns_correct_path(self, tmp_path: Path) -> None:
         """IndexStore.vector_index_path is db_path with .vectors.npz suffix."""
         db_path = tmp_path / "index.db"
         store = IndexStore(db_path)

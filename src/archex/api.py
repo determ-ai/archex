@@ -805,9 +805,7 @@ def query(
                                 embedder_name=index_config.embedder or "",
                                 vector_dim=embedder.dimension,
                             )
-                            vector_results = vec_idx_cached.search(
-                                question, embedder, top_k=top_k
-                            )
+                            vector_results = vec_idx_cached.search(question, embedder, top_k=top_k)
                             if timing is not None:
                                 timing.vector_used = True
                                 timing.vector_build_ms = _elapsed_ms(t_vec_cached)
