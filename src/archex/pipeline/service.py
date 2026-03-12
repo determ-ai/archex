@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from archex.acquire import discover_files
 from archex.exceptions import ParseError
+from archex.models import EdgeKind
 from archex.parse import (
     TreeSitterEngine,
     build_file_map,
@@ -25,12 +26,14 @@ if TYPE_CHECKING:
         CodeChunk,
         Config,
         DiscoveredFile,
+        Edge,
         ImportStatement,
         IndexConfig,
         ParsedFile,
     )
     from archex.parse.adapters import LanguageAdapter
     from archex.pipeline.chunker import Chunker
+    from archex.pipeline.models import ArtifactBundle
 
 
 @dataclass
@@ -88,3 +91,93 @@ def build_chunks(
                 raise ParseError(f"Failed to read file: {f.absolute_path}") from err
             continue
     return file_chunker.chunk_files(parsed_files, sources)
+
+
+def _read_sources(
+    files: list[DiscoveredFile],
+    *,
+    strict: bool = False,
+) -> dict[str, bytes]:
+    """Read source bytes for discovered files."""
+    sources: dict[str, bytes] = {}
+    for f in files:
+        try:
+            sources[f.path] = Path(f.absolute_path).read_bytes()
+        except OSError as err:
+            logger.warning("Failed to read file for chunking: %s", f.absolute_path)
+            if strict:
+                raise ParseError(f"Failed to read file: {f.absolute_path}") from err
+            continue
+    return sources
+
+
+def _build_edges(
+    resolved_imports: dict[str, list[ImportStatement]],
+) -> list[Edge]:
+    """Build dependency edges from resolved import map."""
+    from archex.models import Edge
+
+    return [
+        Edge(
+            source=file_path,
+            target=imp.resolved_path,
+            kind=EdgeKind.IMPORTS,
+            location=f"{file_path}:{imp.line}",
+        )
+        for file_path, imps in resolved_imports.items()
+        for imp in imps
+        if imp.resolved_path is not None
+    ]
+
+
+def produce_artifacts(
+    repo_path: Path,
+    config: Config,
+    adapters: dict[str, LanguageAdapter],
+    index_config: IndexConfig | None = None,
+    *,
+    strict: bool = False,
+) -> ArtifactBundle:
+    """Run the full parse → import-resolve → chunk pipeline and return all artifacts.
+
+    This is the unified entry point for artifact production. It composes
+    parse_repository() and build_chunks() into a single call that also
+    produces dependency edges and retains source bytes.
+
+    Args:
+        repo_path: Root of the repository to process.
+        config: Discovery and parsing configuration.
+        adapters: Language-specific TreeSitter adapters.
+        index_config: Chunking parameters (defaults to IndexConfig()).
+        strict: Raise on file-read errors instead of skipping.
+
+    Returns:
+        ArtifactBundle with files, parsed_files, resolved_imports, chunks,
+        edges, and source bytes.
+    """
+    from archex.models import IndexConfig as IndexConfigModel
+    from archex.pipeline.models import ArtifactBundle as Bundle
+
+    effective_index_config = index_config or IndexConfigModel()
+
+    # Stage 1: parse + import resolution
+    artifacts = parse_repository(repo_path, config, adapters)
+
+    # Stage 2: read source bytes
+    sources = _read_sources(artifacts.files, strict=strict)
+
+    # Stage 3: chunk
+    chunker: Chunker = ASTChunker(config=effective_index_config)
+    chunks = chunker.chunk_files(artifacts.parsed_files, sources)
+
+    # Stage 4: build dependency edges
+    edges = _build_edges(artifacts.resolved_imports)
+
+    return Bundle(
+        files=artifacts.files,
+        parsed_files=artifacts.parsed_files,
+        resolved_imports=artifacts.resolved_imports,
+        chunks=chunks,
+        edges=edges,
+        sources=sources,
+    )
