@@ -401,9 +401,7 @@ def _archex_fields(
     from archex.models import ContextBundle
 
     assert isinstance(bundle, ContextBundle)
-    unique_files = _deduplicate_ranked(
-        [c.chunk.file_path for c in bundle.chunks]
-    )
+    unique_files = _deduplicate_ranked([c.chunk.file_path for c in bundle.chunks])
     tokens_input = count_file_tokens(repo_path, unique_files)
     tokens_output = bundle.token_count
     token_efficiency = tokens_output / tokens_input if tokens_input > 0 else 0.0
@@ -433,9 +431,7 @@ def _archex_fields(
             else:
                 expanded_files.append(fp)
 
-    expansion_ratio = (
-        len(expanded_files) / len(seed_files) if seed_files else 0.0
-    )
+    expansion_ratio = len(expanded_files) / len(seed_files) if seed_files else 0.0
     seed_recall_val = compute_recall(set(seed_files), task.expected_files)
     seed_precision_val = compute_precision(set(seed_files), task.expected_files)
 
