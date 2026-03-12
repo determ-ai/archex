@@ -10,6 +10,8 @@ from archex.models import CodeChunk, Edge, EdgeKind, SymbolKind
 if TYPE_CHECKING:
     from pathlib import Path
     from types import TracebackType
+else:
+    from pathlib import Path
 
 
 _CREATE_CHUNKS = """
@@ -470,6 +472,11 @@ class IndexStore:
         if null_count > 0:
             self.set_metadata("needs_reindex", "true")
         self._conn.commit()
+
+    @property
+    def vector_index_path(self) -> Path:
+        """Path to the pre-computed vector index (.npz), co-located with the SQLite database."""
+        return Path(self._db_path).with_suffix(".vectors.npz")
 
     @property
     def conn(self) -> sqlite3.Connection:

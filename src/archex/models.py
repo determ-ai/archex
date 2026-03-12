@@ -679,6 +679,7 @@ class PipelineTiming:
     parse_failure_count: int = 0
     vector_used: bool = False
     vector_build_ms: float = 0.0
+    vector_index_ms: float = 0.0
     strategy: str = ""  # "full", "cached", "delta"
 
 
