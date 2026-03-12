@@ -130,6 +130,11 @@ _STOPWORDS = frozenset(
 )
 
 
+def _deduplicate_ranked(ranked_files: list[str]) -> list[str]:
+    """Deduplicate file paths preserving first-occurrence order."""
+    return list(dict.fromkeys(ranked_files))
+
+
 def compute_f1(recall: float, precision: float) -> float:
     """Harmonic mean of recall and precision."""
     if recall + precision == 0.0:
@@ -139,8 +144,9 @@ def compute_f1(recall: float, precision: float) -> float:
 
 def compute_mrr(ranked_files: list[str], expected_files: list[str]) -> float:
     """Mean reciprocal rank: reciprocal of the rank of the first expected file found."""
+    deduped = _deduplicate_ranked(ranked_files)
     expected_set = set(expected_files)
-    for i, f in enumerate(ranked_files, 1):
+    for i, f in enumerate(deduped, 1):
         if f in expected_set:
             return 1.0 / i
     return 0.0
@@ -164,13 +170,18 @@ def compute_precision(result_files: set[str], expected_files: list[str]) -> floa
 
 
 def compute_ndcg(ranked_files: list[str], expected_files: list[str], k: int = 10) -> float:
-    """Normalized discounted cumulative gain at k."""
+    """Normalized discounted cumulative gain at k.
+
+    Deduplicates ranked_files to prevent the same file from contributing
+    relevance at multiple positions.
+    """
     if not expected_files:
         return 0.0
+    deduped = _deduplicate_ranked(ranked_files)
     expected_set = set(expected_files)
     # DCG
     dcg = 0.0
-    for i, f in enumerate(ranked_files[:k]):
+    for i, f in enumerate(deduped[:k]):
         rel = 1.0 if f in expected_set else 0.0
         dcg += rel / math.log2(i + 2)  # i+2 because log2(1)=0
     # Ideal DCG
@@ -182,13 +193,18 @@ def compute_ndcg(ranked_files: list[str], expected_files: list[str], k: int = 10
 
 
 def compute_map(ranked_files: list[str], expected_files: list[str]) -> float:
-    """Mean average precision."""
+    """Mean average precision.
+
+    Deduplicates ranked_files to prevent the same file from inflating
+    precision-at-k calculations.
+    """
     if not expected_files:
         return 0.0
+    deduped = _deduplicate_ranked(ranked_files)
     expected_set = set(expected_files)
     hits = 0
     sum_precision = 0.0
-    for i, f in enumerate(ranked_files, 1):
+    for i, f in enumerate(deduped, 1):
         if f in expected_set:
             hits += 1
             sum_precision += hits / i
