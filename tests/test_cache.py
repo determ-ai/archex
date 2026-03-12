@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import time
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
@@ -369,3 +371,162 @@ class TestCacheEdgeCases:
         # Should not crash, just return None
         result = cache.find_store_for_source(source)
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Metadata (get_meta / put with kwargs)
+# ---------------------------------------------------------------------------
+
+
+class TestMetadata:
+    def test_put_stores_json_metadata(self, cache: CacheManager, sample_db: Path) -> None:
+        cache.put(KEY_A, sample_db, resolved_commit="abc123", source_identity="/my/repo")
+        meta = cache.get_meta(KEY_A)
+        assert meta["resolved_commit"] == "abc123"
+        assert meta["source_identity"] == "/my/repo"
+        assert "created_at" in meta
+
+    def test_put_without_kwargs_stores_empty_strings(
+        self, cache: CacheManager, sample_db: Path
+    ) -> None:
+        cache.put(KEY_A, sample_db)
+        meta = cache.get_meta(KEY_A)
+        assert meta["resolved_commit"] == ""
+        assert meta["source_identity"] == ""
+
+    def test_get_meta_backward_compat_bare_timestamp(
+        self, cache: CacheManager, sample_db: Path
+    ) -> None:
+        """Old-format meta files contain a bare float timestamp."""
+        cache.put(KEY_A, sample_db)
+        ts = str(time.time())
+        cache.meta_path(KEY_A).write_text(ts)
+        meta = cache.get_meta(KEY_A)
+        assert meta == {"created_at": ts}
+
+    def test_get_meta_missing_file(self, cache: CacheManager) -> None:
+        assert cache.get_meta(KEY_A) == {}
+
+    def test_get_meta_corrupt_json(self, cache: CacheManager, sample_db: Path) -> None:
+        cache.put(KEY_A, sample_db)
+        cache.meta_path(KEY_A).write_text("{broken json")
+        assert cache.get_meta(KEY_A) == {}
+
+    def test_get_meta_empty_file(self, cache: CacheManager, sample_db: Path) -> None:
+        cache.put(KEY_A, sample_db)
+        cache.meta_path(KEY_A).write_text("")
+        assert cache.get_meta(KEY_A) == {}
+
+
+# ---------------------------------------------------------------------------
+# is_stale
+# ---------------------------------------------------------------------------
+
+
+class TestIsStale:
+    def test_fresh_entry_not_stale(self, cache: CacheManager, sample_db: Path) -> None:
+        cache.put(KEY_A, sample_db)
+        assert cache.is_stale(KEY_A, max_age_hours=24) is False
+
+    def test_old_entry_is_stale(self, cache: CacheManager, sample_db: Path) -> None:
+        cache.put(KEY_A, sample_db)
+        old_ts = time.time() - 48 * 3600
+        meta_data = json.dumps(
+            {"created_at": str(old_ts), "resolved_commit": "", "source_identity": ""}
+        )
+        cache.meta_path(KEY_A).write_text(meta_data)
+        assert cache.is_stale(KEY_A, max_age_hours=24) is True
+
+    def test_missing_meta_is_stale(self, cache: CacheManager) -> None:
+        assert cache.is_stale(KEY_A) is True
+
+    def test_corrupt_created_at_is_stale(self, cache: CacheManager, sample_db: Path) -> None:
+        cache.put(KEY_A, sample_db)
+        meta_data = json.dumps({"created_at": "not_a_number"})
+        cache.meta_path(KEY_A).write_text(meta_data)
+        assert cache.is_stale(KEY_A) is True
+
+
+# ---------------------------------------------------------------------------
+# resolve_remote_head
+# ---------------------------------------------------------------------------
+
+
+class TestResolveRemoteHead:
+    def test_returns_none_for_none_url(self) -> None:
+        assert CacheManager.resolve_remote_head(None) is None
+
+    def test_returns_none_for_empty_url(self) -> None:
+        assert CacheManager.resolve_remote_head("") is None
+
+    def test_parses_ls_remote_output(self) -> None:
+        fake_output = "abc123def456\tHEAD\n"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
+            mock_run.return_value.stdout = fake_output
+            result = CacheManager.resolve_remote_head("https://github.com/example/repo.git")
+        assert result == "abc123def456"
+
+    def test_returns_none_on_failure(self) -> None:
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 128
+            mock_run.return_value.stdout = ""
+            result = CacheManager.resolve_remote_head("https://github.com/example/repo.git")
+        assert result is None
+
+    def test_returns_none_on_timeout(self) -> None:
+        import subprocess
+
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("git", 15)):
+            result = CacheManager.resolve_remote_head("https://github.com/example/repo.git")
+        assert result is None
+
+    def test_returns_none_on_empty_output(self) -> None:
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value.returncode = 0
+            mock_run.return_value.stdout = ""
+            result = CacheManager.resolve_remote_head("https://github.com/example/repo.git")
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# cache_key with remote resolution
+# ---------------------------------------------------------------------------
+
+
+class TestCacheKeyRemoteResolution:
+    def test_url_source_uses_remote_head(self, tmp_path: Path) -> None:
+        """URL source without explicit commit resolves HEAD via ls-remote."""
+        cm = CacheManager(cache_dir=str(tmp_path))
+        source = RepoSource(url="https://github.com/example/repo.git")
+        with patch.object(CacheManager, "resolve_remote_head", return_value="deadbeef" * 5):
+            key = cm.cache_key(source)
+
+        # Key should incorporate the resolved commit
+        expected_identity = f"https://github.com/example/repo.git@{'deadbeef' * 5}"
+        expected_key = hashlib.sha256(expected_identity.encode()).hexdigest()
+        assert key == expected_key
+
+    def test_url_source_with_explicit_commit_skips_resolution(self, tmp_path: Path) -> None:
+        """URL source with explicit commit uses the pinned commit directly."""
+        cm = CacheManager(cache_dir=str(tmp_path))
+        source = RepoSource(url="https://github.com/example/repo.git", commit="pinned123")
+        with patch.object(CacheManager, "resolve_remote_head") as mock_resolve:
+            key = cm.cache_key(source)
+
+        # Should not call resolve_remote_head since commit is already set
+        mock_resolve.assert_not_called()
+        expected_identity = "https://github.com/example/repo.git@pinned123"
+        expected_key = hashlib.sha256(expected_identity.encode()).hexdigest()
+        assert key == expected_key
+
+    def test_url_source_unresolvable_falls_back_to_url_only(self, tmp_path: Path) -> None:
+        """URL source where remote HEAD resolution fails uses URL-only key."""
+        cm = CacheManager(cache_dir=str(tmp_path))
+        source = RepoSource(url="https://github.com/example/repo.git")
+        with patch.object(CacheManager, "resolve_remote_head", return_value=None):
+            key = cm.cache_key(source)
+
+        expected_identity = "https://github.com/example/repo.git"
+        expected_key = hashlib.sha256(expected_identity.encode()).hexdigest()
+        assert key == expected_key

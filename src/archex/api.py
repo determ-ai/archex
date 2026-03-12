@@ -117,7 +117,12 @@ def _full_index(
             store.set_metadata("source_identity", identity)
             store.set_metadata("indexed_at", str(time.time()))
             store.conn.execute("PRAGMA wal_checkpoint(FULL)")
-            cache.put(cache_key, db_path)
+            cache.put(
+                cache_key,
+                db_path,
+                resolved_commit=commit,
+                source_identity=identity,
+            )
         if timing is not None:
             timing.index_ms = _elapsed_ms(t_idx)
             timing.strategy = "full"
@@ -193,7 +198,12 @@ def _ensure_index(
                         store.set_metadata("source_identity", identity)
                         store.set_metadata("indexed_at", str(time.time()))
                         store.conn.execute("PRAGMA wal_checkpoint(FULL)")
-                        cache.put(cache_key, db_path)
+                        cache.put(
+                            cache_key,
+                            db_path,
+                            resolved_commit=current_commit,
+                            source_identity=identity,
+                        )
                         if timing is not None:
                             timing.delta_ms = delta_meta.delta_time_ms
                             timing.delta_meta = delta_meta
@@ -798,7 +808,12 @@ def query(
                 store.set_metadata("source_identity", identity)
                 store.set_metadata("indexed_at", str(time.time()))
                 store.conn.execute("PRAGMA wal_checkpoint(FULL)")
-                cache.put(cache_key, db_path)
+                cache.put(
+                    cache_key,
+                    db_path,
+                    resolved_commit=commit,
+                    source_identity=identity,
+                )
 
             # Passthrough: entire repo fits within budget
             if effective_budget >= total_repo_tokens:
