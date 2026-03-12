@@ -101,11 +101,8 @@ def passthrough_context(
     )
 
 
-def _query_terms(question: str) -> set[str]:
-    """Extract lowercased content words from a query for expansion prioritization."""
-    import re
-
-    stop = {
+_QUERY_STOP = frozenset(
+    {
         "how",
         "does",
         "implement",
@@ -139,8 +136,91 @@ def _query_terms(question: str) -> set[str]:
         "show",
         "find",
     }
-    words = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{2,}", question)
-    return {w.lower() for w in words if w.lower() not in stop}
+)
+
+# Architecture-intent synonyms: map each architectural keyword to code-level equivalents.
+# These expand BM25 misses caused by vocabulary gaps between natural-language queries
+# and the actual identifiers/comments in source files.
+_ARCH_SYNONYMS: dict[str, list[str]] = {
+    "pipeline": ["workflow", "chain", "process"],
+    "middleware": ["handler", "interceptor", "filter"],
+    "registry": ["register", "catalog", "factory"],
+    "adapter": ["plugin", "connector", "driver"],
+    "injection": ["inject", "resolve", "depend"],
+    "routing": ["route", "router", "dispatch"],
+    "indexing": ["index", "reindex", "delta"],
+    "dependency": ["depend", "resolve", "inject"],
+}
+
+
+def _split_compound_token(token: str) -> list[str]:
+    """Split a camelCase or snake_case token into component words.
+
+    Pass the original mixed-case token; the caller lowercases all returned
+    parts before use.  Returns the original token plus split components.
+    Examples:
+      "queryPipeline"  → ["queryPipeline", "query", "Pipeline"]
+      "next_function"  → ["next_function", "next", "function"]
+      "BM25Index"      → ["BM25Index", "BM25", "index"]
+    """
+    import re
+
+    # Split snake_case by underscore
+    if "_" in token:
+        parts = [p for p in token.split("_") if p]
+        return [token] + parts if len(parts) > 1 else [token]
+
+    # Split camelCase / PascalCase by uppercase boundaries
+    camel_parts = re.findall(r"[A-Z]?[a-z0-9]+|[A-Z]+(?=[A-Z][a-z]|\d|\b)", token)
+    if len(camel_parts) > 1:
+        return [token] + [p.lower() for p in camel_parts]
+
+    return [token]
+
+
+def _query_terms(question: str) -> set[str]:
+    """Extract lowercased content words from a query for expansion prioritization.
+
+    Enhancements over the basic word-extraction:
+    - Splits camelCase and snake_case tokens into components so path matching
+      works against both joined and split forms.
+    - Keeps compound phrase forms (e.g. "dependency_injection") alongside
+      individual words so expansion scoring can match on both.
+    - Expands architectural-intent keywords to code-level synonyms to close
+      vocabulary gaps between natural-language queries and source identifiers.
+    """
+    import re
+
+    raw_tokens = re.findall(r"[a-zA-Z_][a-zA-Z0-9_]{2,}", question)
+
+    expanded: set[str] = set()
+    normalized_tokens: list[str] = []
+    for tok in raw_tokens:
+        low = tok.lower()
+        if low in _QUERY_STOP:
+            continue
+        # Pass the original (mixed-case) token so camelCase boundaries are visible,
+        # then lowercase all returned parts before adding to the term set.
+        parts = _split_compound_token(tok)
+        for p in parts:
+            p_low = p.lower()
+            if p_low not in _QUERY_STOP and len(p_low) >= 3:
+                expanded.add(p_low)
+                normalized_tokens.append(p_low)
+
+    # Add bigram compound forms for adjacent non-stop pairs (e.g. dependency + injection
+    # → "dependency_injection") so they match identifiers that use this combined form.
+    clean = [t for t in normalized_tokens if t not in _QUERY_STOP and len(t) >= 3]
+    for i in range(len(clean) - 1):
+        compound = f"{clean[i]}_{clean[i + 1]}"
+        expanded.add(compound)
+
+    # Architecture-intent synonym expansion
+    for term in list(expanded):
+        if term in _ARCH_SYNONYMS:
+            expanded.update(_ARCH_SYNONYMS[term])
+
+    return expanded
 
 
 def assemble_context(
