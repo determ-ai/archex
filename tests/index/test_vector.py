@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -15,7 +14,7 @@ from archex.index.vector import VectorIndex, reciprocal_rank_fusion
 from archex.models import CodeChunk, SymbolKind
 
 if TYPE_CHECKING:
-    pass
+    from pathlib import Path
 
 
 class FakeEmbedder:
