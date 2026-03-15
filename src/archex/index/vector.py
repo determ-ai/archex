@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from archex.exceptions import ArchexIndexError
+from archex.models import ChunkSurrogate, VectorMode
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -27,7 +28,14 @@ class VectorIndex:
         self._chunk_ids: list[str] = []
         self._chunks_by_id: dict[str, CodeChunk] = {}
 
-    def build(self, chunks: list[CodeChunk], embedder: Embedder) -> None:
+    def build(
+        self,
+        chunks: list[CodeChunk],
+        embedder: Embedder,
+        *,
+        surrogates_by_chunk_id: dict[str, ChunkSurrogate] | None = None,
+        vector_mode: VectorMode = VectorMode.RAW,
+    ) -> None:
         """Encode all chunks and store normalized vectors."""
         if not chunks:
             self._vectors = None
@@ -35,7 +43,12 @@ class VectorIndex:
             self._chunks_by_id = {}
             return
 
-        texts = [c.content for c in chunks]
+        texts = [
+            surrogates_by_chunk_id[c.id].surrogate_text
+            if vector_mode == VectorMode.SURROGATE and surrogates_by_chunk_id and c.id in surrogates_by_chunk_id
+            else c.content
+            for c in chunks
+        ]
         raw_embeddings = embedder.encode(texts)
         vectors = np.array(raw_embeddings, dtype=np.float32)
 
@@ -90,7 +103,15 @@ class VectorIndex:
             return int(self._vectors.shape[1])
         return 0
 
-    def save(self, path: Path, *, embedder_name: str = "", vector_dim: int = 0) -> None:
+    def save(
+        self,
+        path: Path,
+        *,
+        embedder_name: str = "",
+        vector_dim: int = 0,
+        vector_mode: VectorMode = VectorMode.RAW,
+        surrogate_version: str = "v1",
+    ) -> None:
         """Save vectors and chunk IDs to a compressed numpy file."""
         if self._vectors is None:
             raise ArchexIndexError("Cannot save empty vector index")
@@ -101,6 +122,7 @@ class VectorIndex:
             vectors=self._vectors,
             chunk_ids=np.array(self._chunk_ids, dtype="U512"),
             embedder_meta=np.array([embedder_name, str(vector_dim)], dtype="U256"),
+            vector_meta=np.array([str(vector_mode), surrogate_version], dtype="U256"),
         )
 
     def load(
@@ -110,6 +132,8 @@ class VectorIndex:
         *,
         embedder_name: str = "",
         vector_dim: int = 0,
+        vector_mode: VectorMode = VectorMode.RAW,
+        surrogate_version: str = "v1",
     ) -> None:
         """Load vectors from disk and rebuild the chunk lookup map."""
         if not path.exists():
@@ -139,6 +163,17 @@ class VectorIndex:
                     raise ArchexIndexError(
                         f"Vector dim mismatch: cached={stored_dim}, current={vector_dim}"
                     )
+        if "vector_meta" in data:
+            stored_mode, stored_version = [str(v) for v in data["vector_meta"][:2]]
+            if stored_mode and stored_mode != str(vector_mode):
+                raise ArchexIndexError(
+                    f"Vector mode mismatch: cached={stored_mode}, current={vector_mode}"
+                )
+            if stored_mode == str(VectorMode.SURROGATE) and stored_version != surrogate_version:
+                raise ArchexIndexError(
+                    "Surrogate version mismatch: "
+                    f"cached={stored_version}, current={surrogate_version}"
+                )
 
         self._vectors = vectors
         self._chunk_ids = chunk_ids
@@ -149,6 +184,9 @@ class VectorIndex:
         query: str,
         candidates: list[CodeChunk],
         embedder: Embedder,
+        *,
+        surrogates_by_chunk_id: dict[str, ChunkSurrogate] | None = None,
+        vector_mode: VectorMode = VectorMode.RAW,
     ) -> list[tuple[CodeChunk, float]]:
         """Embed only the candidate chunks and query, return sorted by cosine similarity.
 
@@ -159,7 +197,12 @@ class VectorIndex:
         if not candidates:
             return []
 
-        texts = [query] + [c.content for c in candidates]
+        texts = [query] + [
+            surrogates_by_chunk_id[c.id].surrogate_text
+            if vector_mode == VectorMode.SURROGATE and surrogates_by_chunk_id and c.id in surrogates_by_chunk_id
+            else c.content
+            for c in candidates
+        ]
         encode_np = getattr(embedder, "encode_ndarray", None)
         if encode_np is not None:
             vecs = encode_np(texts)
