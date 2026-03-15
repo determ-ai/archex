@@ -244,7 +244,14 @@ def _ensure_index(
                             timing.delta_attempted = True
                         store = IndexStore(db_path)
                         graph = DependencyGraph.from_edges(store.get_edges())
-                        delta_meta = apply_delta(store, graph, manifest, repo_path, config)
+                        delta_meta = apply_delta(
+                            store,
+                            graph,
+                            manifest,
+                            repo_path,
+                            config,
+                            index_config=index_config,
+                        )
                         identity = source.url or source.local_path or ""
                         store.set_metadata("commit_hash", current_commit)
                         store.set_metadata("source_identity", identity)
