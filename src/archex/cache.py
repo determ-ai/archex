@@ -115,10 +115,18 @@ class CacheManager:
         self._validate_key(key)
         return self._cache_dir / f"{key}.meta"
 
-    def vector_path(self, key: str) -> Path:
-        """Return the vector index file path for a cache key."""
+    def vector_path(
+        self,
+        key: str,
+        *,
+        vector_mode: str = "raw",
+        surrogate_version: str = "v1",
+    ) -> Path:
+        """Return the representation-specific vector index file path for a cache key."""
         self._validate_key(key)
-        return self._cache_dir / f"{key}.vectors.npz"
+        if vector_mode == "raw":
+            return self._cache_dir / f"{key}.vectors.npz"
+        return self._cache_dir / f"{key}.{vector_mode}.{surrogate_version}.vectors.npz"
 
     # ------------------------------------------------------------------
     # CRUD
