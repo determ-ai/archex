@@ -356,9 +356,7 @@ def assemble_context(
 
     # Effective expansion threshold: caller override takes precedence over constant.
     effective_expansion_min = (
-        expansion_min_override
-        if expansion_min_override is not None
-        else SEED_EXPANSION_MIN
+        expansion_min_override if expansion_min_override is not None else SEED_EXPANSION_MIN
     )
 
     # --- Graph expansion phase ---

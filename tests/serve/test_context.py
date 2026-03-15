@@ -516,7 +516,7 @@ def test_fusion_weights_recorded_in_metadata_with_vector_results() -> None:
     graph = DependencyGraph()
     for name in ("a.py", "b.py", "c.py", "d.py"):
         graph.add_file_node(name)
-    chunks = [make_chunk(f"c{i}", f"{chr(97+i)}.py", token_count=10) for i in range(4)]
+    chunks = [make_chunk(f"c{i}", f"{chr(97 + i)}.py", token_count=10) for i in range(4)]
     # Provide enough results with flat BM25 scores (low CV) to trigger fusion
     bm25_results = [(chunks[0], 1.0), (chunks[1], 0.9), (chunks[2], 0.8)]
     vec_results = [(chunks[3], 0.9), (chunks[2], 0.8), (chunks[1], 0.7)]
@@ -540,7 +540,7 @@ def test_fusion_skipped_when_bm25_confident() -> None:
     graph = DependencyGraph()
     for name in ("a.py", "b.py", "c.py"):
         graph.add_file_node(name)
-    chunks = [make_chunk(f"c{i}", f"{chr(97+i)}.py", token_count=10) for i in range(3)]
+    chunks = [make_chunk(f"c{i}", f"{chr(97 + i)}.py", token_count=10) for i in range(3)]
     # High CV (very spread scores) + high agreement (same files)
     bm25_results = [(chunks[0], 10.0), (chunks[1], 1.0), (chunks[2], 0.1)]
     vec_results = [(chunks[0], 0.95), (chunks[1], 0.5), (chunks[2], 0.1)]
@@ -574,7 +574,7 @@ def test_fusion_weights_reflect_high_agreement() -> None:
     graph = DependencyGraph()
     for name in ("a.py", "b.py", "c.py"):
         graph.add_file_node(name)
-    chunks = [make_chunk(f"c{i}", f"{chr(97+i)}.py", token_count=10) for i in range(3)]
+    chunks = [make_chunk(f"c{i}", f"{chr(97 + i)}.py", token_count=10) for i in range(3)]
     # Perfect agreement: both signals return the same files with flat scores (low CV)
     bm25_results = [(chunks[0], 5.0), (chunks[1], 4.8), (chunks[2], 4.5)]
     vec_results = [(chunks[0], 0.9), (chunks[1], 0.85), (chunks[2], 0.8)]
